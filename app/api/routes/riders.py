@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.rider_profile import RiderProfile
 from app.schemas.rider import RiderUpsert, RiderOut
 from app.core.config import settings
+from fastapi import Header
 
 router = APIRouter()
 
@@ -77,11 +78,19 @@ def set_availability(
 @router.get("/available", response_model=list[RiderOut])
 def list_available_riders(zone: str | None = None, db: Session = Depends(get_db)):
     q = db.query(User, RiderProfile).join(RiderProfile, RiderProfile.user_id == User.id)
-    q = q.filter(RiderProfile.is_available == True)  # noqa: E712
-    if zone:
-        q = q.filter(RiderProfile.zone.ilike(zone))
 
+
+    q = q.filter(RiderProfile.is_available == True)  # noqa: E712
+    q = q.filter(RiderProfile.is_verified == True)   # noqa: E712
+
+
+    if zone:
+        q = q.filter(RiderProfile.zone.ilike(f"%{zone}%"))
+    
+    
     rows = q.limit(50).all()
+
+
     out: list[RiderOut] = []
     for user, profile in rows:
         out.append(
@@ -96,3 +105,24 @@ def list_available_riders(zone: str | None = None, db: Session = Depends(get_db)
             )
         )
     return out
+@router.post("/admin/riders/verify")
+def admin_verify_rider(phone: str, x_admin_secret: str | None = Header(default=None), db: Session = Depends(get_db)):
+    if not x_admin_secret or x_admin_secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not setting.DEV and settings.ADMIN_SECRET.startswith("CHANGE_ME"):
+        raise HTTPException(status_code=500, detail="Admin secret not configured")
+
+
+    user = db.query(User).filter(User.phone == phone).first()
+    if not  user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Rider profile not found")
+
+    profile.is_verified = True
+    db.commit()
+
+    return {"ok": True, "phone": phone, "is_verified": True}
