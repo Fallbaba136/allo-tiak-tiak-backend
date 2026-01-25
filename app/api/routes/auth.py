@@ -16,6 +16,16 @@ router = APIRouter()
 @router.post("/otp/start")
 def otp_start(payload: OTPStartRequest, db: Session = Depends(get_db)):
     phone = payload.phone.strip()
+    
+    #MVP rate-limit: 1 OPT per phone per 60 seconds
+    latest = (
+        db.query(OTPCode)
+        .filter(OTPCode.phone == phone)
+        .order_by(OTPCode.created_at.desc())
+        .first()
+     )
+    if latest and (int(time()) - (latest.expires_at_ts - settings.OTP_TTL_MINUTES * 60)) < 60:
+       raise HTTPException(status_code=429, detail="Trop de demandes. Réessayez dans 60s.")
 
     # Generate 6-digit OTP (MVP)
     code = f"{secrets.randbelow(10**6):06d}"
@@ -28,11 +38,13 @@ def otp_start(payload: OTPStartRequest, db: Session = Depends(get_db)):
     db.commit()
 
     # MVP ONLY: return OTP for testing (replace by SMS later)
-    return {
+    resp = {
         "message": "OTP generated (MVP).",
-        "otp_for_test": code,
         "expires_in_minutes": settings.OTP_TTL_MINUTES,
     }
+    if settings.DEV:
+        resp["otp_for_test"] = code
+    return resp
 
 @router.post("/otp/verify", response_model=TokenResponse)
 def otp_verify(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
