@@ -17,6 +17,11 @@ router = APIRouter()
 def otp_start(payload: OTPStartRequest, db: Session = Depends(get_db)):
     phone = payload.phone.strip()
     
+    #Cleanup expired OTPs (MVP)
+    now_ts = int(time())
+    db.query(OTPCode).filter(OTPCode.expires_at_ts < now_ts).delete()
+    db.commit()
+    
     #MVP rate-limit: 1 OPT per phone per 60 seconds
     latest = (
         db.query(OTPCode)
