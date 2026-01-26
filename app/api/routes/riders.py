@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.rider_profile import RiderProfile
 from app.schemas.rider import RiderUpsert, RiderOut
 from app.core.config import settings
-from fastapi import Header
+
 
 router = APIRouter()
 
@@ -107,10 +107,14 @@ def list_available_riders(zone: str | None = None, db: Session = Depends(get_db)
     return out
 @router.post("/admin/riders/verify")
 def admin_verify_rider(phone: str, x_admin_secret: str | None = Header(default=None), db: Session = Depends(get_db)):
+    if not settings.DEV:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
     if not x_admin_secret or x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if not setting.DEV and settings.ADMIN_SECRET.startswith("CHANGE_ME"):
+    if not settings.DEV and settings.ADMIN_SECRET.startswith("CHANGE_ME"):
         raise HTTPException(status_code=500, detail="Admin secret not configured")
 
 
