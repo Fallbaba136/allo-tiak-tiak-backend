@@ -4,8 +4,8 @@ from app.core.config import settings
 import hashlib
 import hmac
 
+# ✅ Code corrigé complet
 def hash_code(code: str) -> str:
-    # HMAC-SHA256(code, secret) => stable et safe pour OTP
     code_bytes = code.encode("utf-8")
     secret_bytes = settings.JWT_SECRET.encode("utf-8")
     return hmac.new(secret_bytes, code_bytes, hashlib.sha256).hexdigest()

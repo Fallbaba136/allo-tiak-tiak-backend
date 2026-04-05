@@ -73,7 +73,7 @@ def otp_verify(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.phone == phone).first()
     if not user:
-        user = User(phone=phone, is_phone_verified=True, role="rider")
+        user = User(phone=phone, is_phone_verified=True, role=payload.role)
         db.add(user)
     else:
         user.is_phone_verified = True

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Literal
 
 class OTPStartRequest(BaseModel):
     phone: str
@@ -6,6 +7,7 @@ class OTPStartRequest(BaseModel):
 class OTPVerifyRequest(BaseModel):
     phone: str
     code: str
+    role: Literal["client", "rider"] = "client"
 
 class TokenResponse(BaseModel):
     access_token: str
