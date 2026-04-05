@@ -13,3 +13,4 @@ class User(Base):
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     rider_profile = relationship("RiderProfile", back_populates="user", uselist=False)
+    client_profile = relationship("ClientProfile", back_populates="user", uselist=False)  # ✅ ajouté

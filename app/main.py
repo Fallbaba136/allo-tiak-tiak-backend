@@ -10,6 +10,8 @@ from app.api.routes.riders import router as riders_router
 from app.models.user import User  # noqa
 from app.models.rider_profile import RiderProfile  # noqa
 from app.models.otp_code import OTPCode  # noqa
+from app.models.client_profile import ClientProfile  # noqa  ✅ ajouté
+from app.api.routes.clients import router as clients_router  # ✅ ajouté
 
 app = FastAPI(title="Allô Tiak-Tiak API", version="0.1.0")
 
@@ -20,3 +22,4 @@ def on_startup():
 app.include_router(health_router, prefix="/health", tags=["health"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(riders_router, prefix="/riders", tags=["riders"])
+app.include_router(clients_router, prefix="/clients", tags=["clients"])  # ✅ ajouté
