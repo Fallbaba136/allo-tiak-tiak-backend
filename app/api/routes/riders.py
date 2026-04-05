@@ -39,6 +39,25 @@ def upsert_my_profile(
         is_verified=profile.is_verified,
     )
 
+@router.get("/me", response_model=RiderOut)
+def get_my_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    return RiderOut(
+        phone=current_user.phone,
+        full_name=profile.full_name,
+        zone=profile.zone,
+        payment_provider=profile.payment_provider,
+        payment_phone=profile.payment_phone,
+        is_available=profile.is_available,
+        is_verified=profile.is_verified,
+    )
+
 @router.post("/me/availability")
 def set_availability(
     is_available: bool,
