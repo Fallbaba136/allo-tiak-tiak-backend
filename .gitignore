@@ -1,5 +1,17 @@
+#Environnements virtuels
+env/
 .venv/
+
+#Cache python
 __pycache__/
 *.pyc
+
+#Variables sensibles
 .env
+
+#Base de données locale
 *.db
+
+*.sqlite3
+.vscode/
+.idea/
