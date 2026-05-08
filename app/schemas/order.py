@@ -8,6 +8,7 @@ class OrderCreate(BaseModel):
     description: str | None = None
     zone: str | None = None
     rider_id: int
+    receiver_phone: str  # numéro du receveur
 
 class OrderOut(BaseModel):
     id: int
@@ -17,6 +18,7 @@ class OrderOut(BaseModel):
     delivery_address: str
     description: str | None
     zone: str | None
+    receiver_phone: str
     status: str
     accepted_at: datetime | None
     picked_up_at: datetime | None
@@ -26,4 +28,7 @@ class OrderOut(BaseModel):
     created_at: datetime
 
 class OrderStatusUpdate(BaseModel):
-    status: Literal["accepted", "in_progress", "delivered", "confirmed", "cancelled", "disputed"]
+    status: Literal["accepted", "in_progress", "delivered", "cancelled", "disputed"]
+
+class DeliveryCodeVerify(BaseModel):
+    code: str  # le livreur entre le code donné par le receveur

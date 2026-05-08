@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+from time import time
+import secrets
 
 from app.db.session import get_db
 from app.models.user import User
 from app.models.order import Order
-from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate
+from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, DeliveryCodeVerify
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -19,6 +21,7 @@ def order_to_out(o: Order) -> OrderOut:
         delivery_address=o.delivery_address,
         description=o.description,
         zone=o.zone,
+        receiver_phone=o.receiver_phone,
         status=o.status,
         accepted_at=o.accepted_at,
         picked_up_at=o.picked_up_at,
@@ -28,6 +31,7 @@ def order_to_out(o: Order) -> OrderOut:
         created_at=o.created_at,
     )
 
+# Client crée une commande
 @router.post("/", response_model=OrderOut)
 def create_order(
     payload: OrderCreate,
@@ -48,6 +52,7 @@ def create_order(
         delivery_address=payload.delivery_address,
         description=payload.description,
         zone=payload.zone,
+        receiver_phone=payload.receiver_phone,
         status="pending",
     )
     db.add(order)
@@ -55,6 +60,7 @@ def create_order(
     db.refresh(order)
     return order_to_out(order)
 
+# Client ou livreur voit ses commandes
 @router.get("/my-orders", response_model=list[OrderOut])
 def get_my_orders(
     db: Session = Depends(get_db),
@@ -68,6 +74,7 @@ def get_my_orders(
         raise HTTPException(status_code=403, detail="Accès refusé")
     return [order_to_out(o) for o in orders]
 
+# Mise à jour du statut
 @router.patch("/{order_id}/status", response_model=OrderOut)
 def update_order_status(
     order_id: int,
@@ -81,16 +88,16 @@ def update_order_status(
 
     now = datetime.now(timezone.utc)
 
+    # Règles client
     if current_user.role == "client":
         if order.client_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
-        if payload.status not in ["cancelled", "confirmed", "disputed"]:
+        if payload.status not in ["cancelled", "disputed"]:
             raise HTTPException(status_code=403, detail="Action non autorisée pour le client")
         if payload.status == "cancelled":
             order.cancelled_at = now
-        if payload.status == "confirmed":
-            order.confirmed_at = now
 
+    # Règles livreur
     if current_user.role == "rider":
         if order.rider_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
@@ -98,12 +105,56 @@ def update_order_status(
             raise HTTPException(status_code=403, detail="Action non autorisée pour le livreur")
         if payload.status == "accepted":
             order.accepted_at = now
+            # Générer le code de livraison
+            code = f"{secrets.randbelow(10**6):06d}"
+            order.delivery_code = code
+            order.delivery_code_expires_at = int(time()) + 60 * 60 * 24  # 24h
+            # MVP : afficher le code (remplacer par SMS plus tard)
+            print(f"[MVP] Code de livraison pour {order.receiver_phone}: {code}")
         if payload.status == "in_progress":
             order.picked_up_at = now
         if payload.status == "delivered":
             order.delivered_at = now
 
     order.status = payload.status
+    db.commit()
+    db.refresh(order)
+    return order_to_out(order)
+
+# Livreur valide le code donné par le receveur
+@router.post("/{order_id}/verify-delivery", response_model=OrderOut)
+def verify_delivery_code(
+    order_id: int,
+    payload: DeliveryCodeVerify,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Seuls les livreurs peuvent valider le code")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.rider_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
+
+    if order.status != "delivered":
+        raise HTTPException(status_code=400, detail="La commande n'est pas encore livrée")
+
+    if not order.delivery_code:
+        raise HTTPException(status_code=400, detail="Aucun code de livraison généré")
+
+    if order.delivery_code_expires_at < int(time()):
+        raise HTTPException(status_code=400, detail="Code expiré")
+
+    if payload.code != order.delivery_code:
+        raise HTTPException(status_code=400, detail="Code incorrect")
+
+    now = datetime.now(timezone.utc)
+    order.status = "confirmed"
+    order.confirmed_at = now
+    order.delivery_code = None  # On efface le code après validation
     db.commit()
     db.refresh(order)
     return order_to_out(order)
