@@ -16,6 +16,8 @@ class RiderProfile(Base):
 
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)  # KYC plus tard
+    
+    fcm_token: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
