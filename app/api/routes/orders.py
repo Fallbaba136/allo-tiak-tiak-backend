@@ -11,6 +11,7 @@ from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, Delivery
 from app.api.dependencies import get_current_user
 from app.services.notification_service import send_order_notification
 from app.models.rider_profile import RiderProfile
+from app.services.sms_service import send_delivery_code_sms
 
 router = APIRouter()
 
@@ -33,7 +34,6 @@ def order_to_out(o: Order) -> OrderOut:
         created_at=o.created_at,
     )
 
-# Client crée une commande
 @router.post("/", response_model=OrderOut)
 def create_order(
     payload: OrderCreate,
@@ -62,7 +62,6 @@ def create_order(
     db.refresh(order)
     return order_to_out(order)
 
-# Client ou livreur voit ses commandes
 @router.get("/my-orders", response_model=list[OrderOut])
 def get_my_orders(
     db: Session = Depends(get_db),
@@ -76,7 +75,6 @@ def get_my_orders(
         raise HTTPException(status_code=403, detail="Accès refusé")
     return [order_to_out(o) for o in orders]
 
-# Mise à jour du statut
 @router.patch("/{order_id}/status", response_model=OrderOut)
 def update_order_status(
     order_id: int,
@@ -90,7 +88,6 @@ def update_order_status(
 
     now = datetime.now(timezone.utc)
 
-    # Règles client
     if current_user.role == "client":
         if order.client_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
@@ -99,7 +96,6 @@ def update_order_status(
         if payload.status == "cancelled":
             order.cancelled_at = now
 
-    # Règles livreur
     if current_user.role == "rider":
         if order.rider_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
@@ -107,14 +103,14 @@ def update_order_status(
             raise HTTPException(status_code=403, detail="Action non autorisée pour le livreur")
         if payload.status == "accepted":
             order.accepted_at = now
-            # Générer le code de livraison
             code = f"{secrets.randbelow(10**6):06d}"
             order.delivery_code = code
-            order.delivery_code_expires_at = int(time()) + 60 * 60 * 24  # 24h
-            # MVP : afficher le code (remplacer par SMS plus tard)
-            print(f"[MVP] Code de livraison pour {order.receiver_phone}: {code}")
-
-            # ✅ Envoyer notification au livreur
+            order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
+            send_delivery_code_sms(
+                receiver_phone=order.receiver_phone,
+                code=code,
+                order_id=order.id,
+            )
             rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
             if rider_profile and rider_profile.fcm_token:
                 try:
@@ -126,7 +122,6 @@ def update_order_status(
                     )
                 except Exception as e:
                     print(f"[FCM] Erreur notification: {e}")
-
         if payload.status == "in_progress":
             order.picked_up_at = now
         if payload.status == "delivered":
@@ -137,7 +132,6 @@ def update_order_status(
     db.refresh(order)
     return order_to_out(order)
 
-# Livreur valide le code donné par le receveur
 @router.post("/{order_id}/verify-delivery", response_model=OrderOut)
 def verify_delivery_code(
     order_id: int,
@@ -170,7 +164,7 @@ def verify_delivery_code(
     now = datetime.now(timezone.utc)
     order.status = "confirmed"
     order.confirmed_at = now
-    order.delivery_code = None  # On efface le code après validation
+    order.delivery_code = None
     db.commit()
     db.refresh(order)
     return order_to_out(order)
