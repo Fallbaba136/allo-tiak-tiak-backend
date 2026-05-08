@@ -14,3 +14,6 @@ class RiderOut(BaseModel):
     payment_phone: str | None
     is_available: bool
     is_verified: bool
+
+class FCMTokenUpdate(BaseModel):
+    fcm_token: str

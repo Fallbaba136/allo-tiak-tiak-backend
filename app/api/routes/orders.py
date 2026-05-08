@@ -9,6 +9,8 @@ from app.models.user import User
 from app.models.order import Order
 from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, DeliveryCodeVerify
 from app.api.dependencies import get_current_user
+from app.services.notification_service import send_order_notification
+from app.models.rider_profile import RiderProfile
 
 router = APIRouter()
 
@@ -111,6 +113,20 @@ def update_order_status(
             order.delivery_code_expires_at = int(time()) + 60 * 60 * 24  # 24h
             # MVP : afficher le code (remplacer par SMS plus tard)
             print(f"[MVP] Code de livraison pour {order.receiver_phone}: {code}")
+
+            # ✅ Envoyer notification au livreur
+            rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+            if rider_profile and rider_profile.fcm_token:
+                try:
+                    send_order_notification(
+                        fcm_token=rider_profile.fcm_token,
+                        order_id=order.id,
+                        pickup=order.pickup_address,
+                        dropoff=order.delivery_address,
+                    )
+                except Exception as e:
+                    print(f"[FCM] Erreur notification: {e}")
+
         if payload.status == "in_progress":
             order.picked_up_at = now
         if payload.status == "delivered":

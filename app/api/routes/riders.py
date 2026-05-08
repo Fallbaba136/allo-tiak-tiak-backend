@@ -5,10 +5,23 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 from app.models.rider_profile import RiderProfile
-from app.schemas.rider import RiderUpsert, RiderOut
+from app.schemas.rider import RiderUpsert, RiderOut, FCMTokenUpdate
 from app.core.config import settings
 
 router = APIRouter()
+
+@router.post("/me/fcm-token")
+def update_fcm_token(
+    payload: FCMTokenUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.fcm_token = payload.fcm_token
+    db.commit()
+    return {"ok": True, "message": "FCM token enregistré"}
 
 @router.put("/me", response_model=RiderOut)
 def upsert_my_profile(
