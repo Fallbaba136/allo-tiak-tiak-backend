@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.db.session import engine
 from app.db.base import Base
 
@@ -12,8 +13,6 @@ from app.api.routes.location import router as location_router
 from app.models.dispute import Dispute  # noqa
 from app.api.routes.disputes import router as disputes_router
 from app.api.routes.reviews import router as reviews_router
-
-# import models for table creation
 from app.models.user import User  # noqa
 from app.models.rider_profile import RiderProfile  # noqa
 from app.models.otp_code import OTPCode  # noqa
@@ -22,9 +21,16 @@ from app.models.order import Order  # noqa
 from app.models.review import Review  # noqa
 from app.api.routes.stats import router as stats_router
 from app.api.routes.admin import router as admin_router
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Allô Tiak-Tiak API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def on_startup():
@@ -40,10 +46,3 @@ app.include_router(disputes_router, prefix="/disputes", tags=["disputes"])
 app.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 app.include_router(stats_router, prefix="/stats", tags=["stats"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://allo-tiak-tiak-admin.netlify.app"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
