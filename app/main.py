@@ -21,6 +21,7 @@ from app.models.client_profile import ClientProfile  # noqa
 from app.models.order import Order  # noqa
 from app.models.review import Review  # noqa
 from app.api.routes.stats import router as stats_router
+from app.api.routes.admin import router as admin_router
 
 app = FastAPI(title="Allô Tiak-Tiak API", version="0.1.0")
 
@@ -37,3 +38,4 @@ app.include_router(location_router, prefix="/location", tags=["location"])
 app.include_router(disputes_router, prefix="/disputes", tags=["disputes"])
 app.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 app.include_router(stats_router, prefix="/stats", tags=["stats"])
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
