@@ -71,6 +71,7 @@ def otp_verify(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
         db.add(user)
     else:
         user.is_phone_verified = True
+        user.role = payload.role
 
     db.commit()
 
