@@ -16,3 +16,4 @@ __pycache__/
 .vscode/
 .idea/
 app/firebase/*.json
+app/firebase/*.Identifier
