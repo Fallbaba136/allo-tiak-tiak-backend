@@ -9,6 +9,8 @@ from app.api.routes.clients import router as clients_router
 from app.api.routes.orders import router as orders_router
 from app.models.rider_location import RiderLocation  # noqa
 from app.api.routes.location import router as location_router
+from app.models.dispute import Dispute  # noqa
+from app.api.routes.disputes import router as disputes_router
 
 # import models for table creation
 from app.models.user import User  # noqa
@@ -29,3 +31,4 @@ app.include_router(riders_router, prefix="/riders", tags=["riders"])
 app.include_router(clients_router, prefix="/clients", tags=["clients"])
 app.include_router(orders_router, prefix="/orders", tags=["orders"])
 app.include_router(location_router, prefix="/location", tags=["location"])
+app.include_router(disputes_router, prefix="/disputes", tags=["disputes"])
