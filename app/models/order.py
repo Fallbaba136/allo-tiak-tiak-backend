@@ -28,6 +28,14 @@ class Order(Base):
     confirmed_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Paiement
+    amount: Mapped[float | None] = mapped_column(nullable=True)  # montant en FCFA
+    commission: Mapped[float | None] = mapped_column(nullable=True)  # commission plateforme
+    payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)  # wave / orange_money
+    payment_status: Mapped[str] = mapped_column(String(30), default="pending")
+    # pending / paid / commission_due
+    payment_confirmed_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

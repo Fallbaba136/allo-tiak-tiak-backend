@@ -7,6 +7,8 @@ from app.api.routes.health import router as health_router
 from app.api.routes.riders import router as riders_router
 from app.api.routes.clients import router as clients_router
 from app.api.routes.orders import router as orders_router
+from app.models.rider_location import RiderLocation  # noqa
+from app.api.routes.location import router as location_router
 
 # import models for table creation
 from app.models.user import User  # noqa
@@ -26,3 +28,4 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(riders_router, prefix="/riders", tags=["riders"])
 app.include_router(clients_router, prefix="/clients", tags=["clients"])
 app.include_router(orders_router, prefix="/orders", tags=["orders"])
+app.include_router(location_router, prefix="/location", tags=["location"])

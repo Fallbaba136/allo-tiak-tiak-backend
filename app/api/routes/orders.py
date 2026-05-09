@@ -12,6 +12,9 @@ from app.api.dependencies import get_current_user
 from app.services.notification_service import send_order_notification
 from app.models.rider_profile import RiderProfile
 from app.services.sms_service import send_delivery_code_sms
+from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, DeliveryCodeVerify, PaymentConfirm
+from app.services.payment_service import calculate_commission, get_payment_summary
+from app.models.rider_profile import RiderProfile
 
 router = APIRouter()
 
@@ -26,11 +29,16 @@ def order_to_out(o: Order) -> OrderOut:
         zone=o.zone,
         receiver_phone=o.receiver_phone,
         status=o.status,
+        amount=o.amount,
+        commission=o.commission,
+        payment_method=o.payment_method,
+        payment_status=o.payment_status,
         accepted_at=o.accepted_at,
         picked_up_at=o.picked_up_at,
         delivered_at=o.delivered_at,
         confirmed_at=o.confirmed_at,
         cancelled_at=o.cancelled_at,
+        payment_confirmed_at=o.payment_confirmed_at,
         created_at=o.created_at,
     )
 
@@ -55,6 +63,7 @@ def create_order(
         description=payload.description,
         zone=payload.zone,
         receiver_phone=payload.receiver_phone,
+        amount=payload.amount,  # ✅ ajouté
         status="pending",
     )
     db.add(order)
@@ -165,6 +174,68 @@ def verify_delivery_code(
     order.status = "confirmed"
     order.confirmed_at = now
     order.delivery_code = None
+    db.commit()
+    db.refresh(order)
+    return order_to_out(order)
+
+
+    # Résumé du paiement — client voit combien payer et où
+@router.get("/{order_id}/payment-summary")
+def get_payment_summary_route(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
+
+    if order.status != "confirmed":
+        raise HTTPException(status_code=400, detail="La commande n'est pas encore confirmée")
+
+    rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
+    if not rider_profile:
+        raise HTTPException(status_code=404, detail="Profil livreur introuvable")
+
+    return get_payment_summary(
+        amount=order.amount,
+        payment_method=rider_profile.payment_provider or "wave",
+        rider_payment_phone=rider_profile.payment_phone,
+    )
+
+# Livreur confirme la réception du paiement
+@router.post("/{order_id}/confirm-payment", response_model=OrderOut)
+def confirm_payment(
+    order_id: int,
+    payload: PaymentConfirm,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Seuls les livreurs peuvent confirmer le paiement")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.rider_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
+
+    if order.status != "confirmed":
+        raise HTTPException(status_code=400, detail="La livraison n'est pas encore confirmée")
+
+    if order.payment_status == "paid":
+        raise HTTPException(status_code=400, detail="Paiement déjà confirmé")
+
+    now = datetime.now(timezone.utc)
+    order.payment_method = payload.payment_method
+    order.payment_status = "paid"
+    order.commission = calculate_commission(order.amount)
+    order.payment_confirmed_at = now
+
     db.commit()
     db.refresh(order)
     return order_to_out(order)
