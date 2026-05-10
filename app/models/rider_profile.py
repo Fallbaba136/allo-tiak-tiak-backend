@@ -11,13 +11,22 @@ class RiderProfile(Base):
     full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     zone: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
-    payment_provider: Mapped[str | None] = mapped_column(String(30), nullable=True)  # wave / orange_money
+    payment_provider: Mapped[str | None] = mapped_column(String(30), nullable=True)
     payment_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)  # KYC plus tard
-    
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+
     fcm_token: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # KYC
+    kyc_status: Mapped[str] = mapped_column(String(30), default="pending")
+    cni_front_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    cni_back_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    selfie_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    permis_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    kyc_rejection_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

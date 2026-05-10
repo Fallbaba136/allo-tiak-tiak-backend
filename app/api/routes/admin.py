@@ -121,3 +121,50 @@ def admin_get_stats(
         "total_commission": round(total_commission or 0, 2),
         "total_revenue": round(total_revenue or 0, 2),
     }
+
+@router.patch("/riders/{user_id}/kyc/approve")
+def admin_approve_kyc(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.kyc_status = "approved"
+    profile.is_verified = True
+    profile.kyc_rejection_reason = None
+    db.commit()
+    return {"message": "KYC approuvé", "user_id": user_id}
+
+
+@router.patch("/riders/{user_id}/kyc/reject")
+def admin_reject_kyc(
+    user_id: int,
+    reason: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.kyc_status = "rejected"
+    profile.is_verified = False
+    profile.kyc_rejection_reason = reason
+    db.commit()
+    return {"message": "KYC rejeté", "user_id": user_id}
+
+
+@router.patch("/riders/{user_id}/block")
+def admin_block_rider(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.is_blocked = not profile.is_blocked
+    db.commit()
+    status = "bloqué" if profile.is_blocked else "débloqué"
+    return {"message": f"Livreur {status}", "user_id": user_id, "is_blocked": profile.is_blocked}
