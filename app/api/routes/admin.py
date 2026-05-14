@@ -175,3 +175,20 @@ def admin_block_rider(
     db.commit()
     status = "bloqué" if profile.is_blocked else "débloqué"
     return {"message": f"Livreur {status}", "user_id": user_id, "is_blocked": profile.is_blocked}
+
+
+@router.delete("/riders/{user_id}")
+def admin_delete_rider(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    user = db.query(User).filter(User.id == user_id).first()
+    db.delete(profile)
+    if user:
+        db.delete(user)
+    db.commit()
+    return {"message": "Profil supprimé", "user_id": user_id}
