@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_MINUTES: int = 60
     ADMIN_SECRET: str = ""
 
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+
     # OTP
     OTP_TTL_MINUTES: int = 10
 
