@@ -7,13 +7,13 @@ class OrderCreate(BaseModel):
     delivery_address: str
     description: str | None = None
     zone: str | None = None
-    rider_id: int
+    rider_id: int | None = None  # None = mode auto (broadcast)
     receiver_phone: str | None = None
     amount: float
     order_type: Literal["delivery", "transport"] = "delivery"
 
     @model_validator(mode="after")
-    def check_receiver_phone(self):
+    def check_fields(self):
         if self.order_type == "delivery" and not self.receiver_phone:
             raise ValueError("receiver_phone est obligatoire pour une livraison")
         return self

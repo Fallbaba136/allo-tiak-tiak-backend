@@ -7,14 +7,12 @@ import secrets
 from app.db.session import get_db
 from app.models.user import User
 from app.models.order import Order
-from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, DeliveryCodeVerify
+from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, DeliveryCodeVerify, PaymentConfirm
 from app.api.dependencies import get_current_user
 from app.services.notification_service import send_order_notification
 from app.models.rider_profile import RiderProfile
 from app.services.sms_service import send_delivery_code_sms
-from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate, DeliveryCodeVerify, PaymentConfirm
 from app.services.payment_service import calculate_commission, get_payment_summary
-from app.models.rider_profile import RiderProfile
 
 router = APIRouter()
 
@@ -52,9 +50,10 @@ def create_order(
     if current_user.role != "client":
         raise HTTPException(status_code=403, detail="Seuls les clients peuvent créer une commande")
 
-    rider = db.query(User).filter(User.id == payload.rider_id, User.role == "rider").first()
-    if not rider:
-        raise HTTPException(status_code=404, detail="Livreur introuvable")
+    if payload.rider_id is not None:
+        rider = db.query(User).filter(User.id == payload.rider_id, User.role == "rider").first()
+        if not rider:
+            raise HTTPException(status_code=404, detail="Livreur introuvable")
 
     order = Order(
         client_id=current_user.id,
@@ -71,6 +70,28 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
+
+    if payload.rider_id is None:
+        query = db.query(RiderProfile).filter(
+            RiderProfile.is_available == True,
+            RiderProfile.is_verified == True,
+            RiderProfile.is_blocked == False,
+        )
+        if payload.zone:
+            query = query.filter(RiderProfile.zone.ilike(f"%{payload.zone}%"))
+        available_riders = query.all()
+        for rp in available_riders:
+            if rp.fcm_token:
+                try:
+                    send_order_notification(
+                        fcm_token=rp.fcm_token,
+                        order_id=order.id,
+                        pickup=order.pickup_address,
+                        dropoff=order.delivery_address,
+                    )
+                except Exception as e:
+                    print(f"[FCM] Erreur notification livreur {rp.user_id}: {e}")
+
     return order_to_out(order)
 
 @router.get("/my-orders", response_model=list[OrderOut])
@@ -83,7 +104,23 @@ def get_my_orders(
     elif current_user.role == "rider":
         orders = db.query(Order).filter(Order.rider_id == current_user.id).all()
     else:
-        raise HTTPException(status_code=403, detail="Accès refusé")
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    return [order_to_out(o) for o in orders]
+
+@router.get("/pending", response_model=list[OrderOut])
+def get_pending_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Reserve aux livreurs")
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+    if not profile or not profile.is_verified or profile.is_blocked:
+        raise HTTPException(status_code=403, detail="Profil non autorise")
+    orders = db.query(Order).filter(
+        Order.status == "pending",
+        Order.rider_id == None,
+    ).order_by(Order.created_at.desc()).all()
     return [order_to_out(o) for o in orders]
 
 @router.patch("/{order_id}/status", response_model=OrderOut)
@@ -103,16 +140,18 @@ def update_order_status(
         if order.client_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
         if payload.status not in ["cancelled", "disputed"]:
-            raise HTTPException(status_code=403, detail="Action non autorisée pour le client")
+            raise HTTPException(status_code=403, detail="Action non autorisee pour le client")
         if payload.status == "cancelled":
             order.cancelled_at = now
 
     if current_user.role == "rider":
-        if order.rider_id != current_user.id:
+        if order.rider_id is not None and order.rider_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
         if payload.status not in ["accepted", "in_progress", "delivered"]:
-            raise HTTPException(status_code=403, detail="Action non autorisée pour le livreur")
+            raise HTTPException(status_code=403, detail="Action non autorisee pour le livreur")
         if payload.status == "accepted":
+            if order.rider_id is None:
+                order.rider_id = current_user.id
             order.accepted_at = now
             if order.order_type == "delivery":
                 code = f"{secrets.randbelow(10**6):06d}"
@@ -138,7 +177,6 @@ def update_order_status(
             order.picked_up_at = now
         if payload.status == "delivered":
             order.delivered_at = now
-            # Pour transport : pas de code SMS, confirmation directe par le client
 
     order.status = payload.status
     db.commit()
@@ -163,13 +201,13 @@ def verify_delivery_code(
         raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
 
     if order.status != "delivered":
-        raise HTTPException(status_code=400, detail="La commande n'est pas encore livrée")
+        raise HTTPException(status_code=400, detail="La commande n'est pas encore livree")
 
     if not order.delivery_code:
-        raise HTTPException(status_code=400, detail="Aucun code de livraison généré")
+        raise HTTPException(status_code=400, detail="Aucun code de livraison genere")
 
     if order.delivery_code_expires_at < int(time()):
-        raise HTTPException(status_code=400, detail="Code expiré")
+        raise HTTPException(status_code=400, detail="Code expire")
 
     if payload.code != order.delivery_code:
         raise HTTPException(status_code=400, detail="Code incorrect")
@@ -182,8 +220,6 @@ def verify_delivery_code(
     db.refresh(order)
     return order_to_out(order)
 
-
-    # Résumé du paiement — client voit combien payer et où
 @router.get("/{order_id}/payment-summary")
 def get_payment_summary_route(
     order_id: int,
@@ -198,7 +234,7 @@ def get_payment_summary_route(
         raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
 
     if order.status != "confirmed":
-        raise HTTPException(status_code=400, detail="La commande n'est pas encore confirmée")
+        raise HTTPException(status_code=400, detail="La commande n'est pas encore confirmee")
 
     rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
     if not rider_profile:
@@ -210,7 +246,6 @@ def get_payment_summary_route(
         rider_payment_phone=rider_profile.payment_phone,
     )
 
-# Livreur confirme la réception du paiement
 @router.post("/{order_id}/confirm-payment", response_model=OrderOut)
 def confirm_payment(
     order_id: int,
@@ -229,10 +264,10 @@ def confirm_payment(
         raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
 
     if order.status != "confirmed":
-        raise HTTPException(status_code=400, detail="La livraison n'est pas encore confirmée")
+        raise HTTPException(status_code=400, detail="La livraison n'est pas encore confirmee")
 
     if order.payment_status == "paid":
-        raise HTTPException(status_code=400, detail="Paiement déjà confirmé")
+        raise HTTPException(status_code=400, detail="Paiement deja confirme")
 
     now = datetime.now(timezone.utc)
     order.payment_method = payload.payment_method
@@ -243,7 +278,6 @@ def confirm_payment(
     db.commit()
     db.refresh(order)
     return order_to_out(order)
-
 
 @router.post("/{order_id}/confirm-transport", response_model=OrderOut)
 def confirm_transport(
@@ -265,7 +299,7 @@ def confirm_transport(
         raise HTTPException(status_code=400, detail="Utilisez verify-delivery pour les livraisons")
 
     if order.status != "delivered":
-        raise HTTPException(status_code=400, detail="Le trajet n'est pas encore terminé")
+        raise HTTPException(status_code=400, detail="Le trajet n'est pas encore termine")
 
     now = datetime.now(timezone.utc)
     order.status = "confirmed"

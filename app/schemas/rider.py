@@ -7,6 +7,7 @@ class RiderUpsert(BaseModel):
     payment_provider: str | None = None
     payment_phone: str | None = None
     services: Literal["delivery", "transport", "delivery,transport"] = "delivery"
+    pricing: str | None = None  # JSON string ex: {"Plateau→Almadies": 2000}
 
 class RiderOut(BaseModel):
     phone: str
@@ -17,6 +18,7 @@ class RiderOut(BaseModel):
     is_available: bool
     is_verified: bool
     services: str
+    pricing: str | None = None
 
 class FCMTokenUpdate(BaseModel):
     fcm_token: str

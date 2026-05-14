@@ -20,6 +20,7 @@ def profile_to_out(user: User, profile: RiderProfile) -> RiderOut:
         is_available=profile.is_available,
         is_verified=profile.is_verified,
         services=profile.services,
+        pricing=profile.pricing,
     )
 
 @router.post("/me/fcm-token")
@@ -51,6 +52,7 @@ def upsert_my_profile(
     profile.payment_provider = payload.payment_provider
     profile.payment_phone = payload.payment_phone
     profile.services = payload.services
+    profile.pricing = payload.pricing
 
     db.commit()
     db.refresh(profile)
