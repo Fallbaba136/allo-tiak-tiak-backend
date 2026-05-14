@@ -21,7 +21,9 @@ class Order(Base):
 
     status: Mapped[str] = mapped_column(String(30), default="pending")
     # pending / accepted / in_progress / delivered / confirmed / cancelled / disputed
-
+    order_type: Mapped[str] = mapped_column(String(20), default="delivery")
+    # delivery / transport
+    receiver_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     accepted_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     picked_up_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)

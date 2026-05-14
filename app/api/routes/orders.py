@@ -29,6 +29,7 @@ def order_to_out(o: Order) -> OrderOut:
         zone=o.zone,
         receiver_phone=o.receiver_phone,
         status=o.status,
+        order_type=o.order_type,
         amount=o.amount,
         commission=o.commission,
         payment_method=o.payment_method,
@@ -63,7 +64,8 @@ def create_order(
         description=payload.description,
         zone=payload.zone,
         receiver_phone=payload.receiver_phone,
-        amount=payload.amount,  # ✅ ajouté
+        amount=payload.amount,
+        order_type=payload.order_type,
         status="pending",
     )
     db.add(order)
@@ -112,14 +114,15 @@ def update_order_status(
             raise HTTPException(status_code=403, detail="Action non autorisée pour le livreur")
         if payload.status == "accepted":
             order.accepted_at = now
-            code = f"{secrets.randbelow(10**6):06d}"
-            order.delivery_code = code
-            order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
-            send_delivery_code_sms(
-                receiver_phone=order.receiver_phone,
-                code=code,
-                order_id=order.id,
-            )
+            if order.order_type == "delivery":
+                code = f"{secrets.randbelow(10**6):06d}"
+                order.delivery_code = code
+                order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
+                send_delivery_code_sms(
+                    receiver_phone=order.receiver_phone,
+                    code=code,
+                    order_id=order.id,
+                )
             rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
             if rider_profile and rider_profile.fcm_token:
                 try:
@@ -135,6 +138,7 @@ def update_order_status(
             order.picked_up_at = now
         if payload.status == "delivered":
             order.delivered_at = now
+            # Pour transport : pas de code SMS, confirmation directe par le client
 
     order.status = payload.status
     db.commit()
@@ -236,6 +240,36 @@ def confirm_payment(
     order.commission = calculate_commission(order.amount)
     order.payment_confirmed_at = now
 
+    db.commit()
+    db.refresh(order)
+    return order_to_out(order)
+
+
+@router.post("/{order_id}/confirm-transport", response_model=OrderOut)
+def confirm_transport(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "client":
+        raise HTTPException(status_code=403, detail="Seuls les clients peuvent confirmer un trajet")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
+
+    if order.order_type != "transport":
+        raise HTTPException(status_code=400, detail="Utilisez verify-delivery pour les livraisons")
+
+    if order.status != "delivered":
+        raise HTTPException(status_code=400, detail="Le trajet n'est pas encore terminé")
+
+    now = datetime.now(timezone.utc)
+    order.status = "confirmed"
+    order.confirmed_at = now
     db.commit()
     db.refresh(order)
     return order_to_out(order)

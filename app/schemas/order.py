@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import Literal
 from datetime import datetime
 
@@ -8,8 +8,15 @@ class OrderCreate(BaseModel):
     description: str | None = None
     zone: str | None = None
     rider_id: int
-    receiver_phone: str
-    amount: float  # montant en FCFA
+    receiver_phone: str | None = None
+    amount: float
+    order_type: Literal["delivery", "transport"] = "delivery"
+
+    @model_validator(mode="after")
+    def check_receiver_phone(self):
+        if self.order_type == "delivery" and not self.receiver_phone:
+            raise ValueError("receiver_phone est obligatoire pour une livraison")
+        return self
 
 class OrderOut(BaseModel):
     id: int
@@ -19,8 +26,9 @@ class OrderOut(BaseModel):
     delivery_address: str
     description: str | None
     zone: str | None
-    receiver_phone: str
+    receiver_phone: str | None
     status: str
+    order_type: str
     amount: float | None
     commission: float | None
     payment_method: str | None

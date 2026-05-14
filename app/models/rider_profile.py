@@ -27,6 +27,8 @@ class RiderProfile(Base):
     permis_url: Mapped[str | None] = mapped_column(String, nullable=True)
     kyc_rejection_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
+    services: Mapped[str] = mapped_column(String(50), default="delivery")
+    # delivery / transport / delivery,transport
 
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
