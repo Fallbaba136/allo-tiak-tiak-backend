@@ -263,3 +263,53 @@ def admin_monthly_stats(
         "delivery_orders": len(delivery_orders),
         "transport_orders": len(transport_orders),
     }
+
+@router.get("/monthly/rider/{user_id}")
+def admin_rider_monthly_stats(
+    user_id: int,
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from sqlalchemy import extract
+    
+    rider = db.query(User).filter(User.id == user_id).first()
+    if not rider:
+        raise HTTPException(status_code=404, detail="Livreur introuvable")
+    
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    
+    orders = db.query(Order).filter(
+        Order.rider_id == user_id,
+        extract('month', Order.created_at) == month,
+        extract('year', Order.created_at) == year,
+    ).all()
+
+    completed = [o for o in orders if o.status == "confirmed"]
+    cancelled = [o for o in orders if o.status == "cancelled"]
+    delivery_orders = [o for o in completed if o.order_type == "delivery"]
+    transport_orders = [o for o in completed if o.order_type == "transport"]
+    total_revenue = sum(o.amount or 0 for o in completed)
+    total_commission = sum(o.commission or 0 for o in completed)
+    rider_net = total_revenue - total_commission
+
+    return {
+        "rider": {
+            "user_id": user_id,
+            "phone": rider.phone,
+            "full_name": profile.full_name if profile else None,
+            "zone": profile.zone if profile else None,
+            "services": profile.services if profile else None,
+        },
+        "month": month,
+        "year": year,
+        "total_orders": len(orders),
+        "completed_orders": len(completed),
+        "cancelled_orders": len(cancelled),
+        "delivery_orders": len(delivery_orders),
+        "transport_orders": len(transport_orders),
+        "total_revenue": round(total_revenue, 2),
+        "total_commission": round(total_commission, 2),
+        "rider_net": round(rider_net, 2),
+    }
