@@ -192,3 +192,74 @@ def admin_delete_rider(
         db.delete(user)
     db.commit()
     return {"message": "Profil supprimé", "user_id": user_id}
+
+@router.get("/clients")
+def admin_get_clients(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.client_profile import ClientProfile
+    users = db.query(User).filter(User.role == "client").all()
+    result = []
+    for u in users:
+        profile = db.query(ClientProfile).filter(ClientProfile.user_id == u.id).first()
+        result.append({
+            "user_id": u.id,
+            "phone": u.phone,
+            "full_name": profile.full_name if profile else None,
+            "address": profile.address if profile else None,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        })
+    return result
+
+
+@router.delete("/clients/{user_id}")
+def admin_delete_client(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.client_profile import ClientProfile
+    profile = db.query(ClientProfile).filter(ClientProfile.user_id == user_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    if profile:
+        db.delete(profile)
+    db.delete(user)
+    db.commit()
+    return {"message": "Client supprimé", "user_id": user_id}
+
+
+@router.get("/monthly")
+def admin_monthly_stats(
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from sqlalchemy import extract
+    orders = db.query(Order).filter(
+        extract('month', Order.created_at) == month,
+        extract('year', Order.created_at) == year,
+    ).all()
+
+    total_orders = len(orders)
+    completed = [o for o in orders if o.status == "confirmed"]
+    cancelled = [o for o in orders if o.status == "cancelled"]
+    total_revenue = sum(o.amount or 0 for o in completed)
+    total_commission = sum(o.commission or 0 for o in completed)
+    delivery_orders = [o for o in orders if o.order_type == "delivery"]
+    transport_orders = [o for o in orders if o.order_type == "transport"]
+
+    return {
+        "month": month,
+        "year": year,
+        "total_orders": total_orders,
+        "completed_orders": len(completed),
+        "cancelled_orders": len(cancelled),
+        "total_revenue": round(total_revenue, 2),
+        "total_commission": round(total_commission, 2),
+        "delivery_orders": len(delivery_orders),
+        "transport_orders": len(transport_orders),
+    }
