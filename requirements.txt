@@ -70,3 +70,5 @@ watchfiles==1.1.1
 websockets==15.0.1
 alembic==1.18.4
 africastalking==2.0.2
+cloudinary==1.44.2
+# updated Thu May 14 10:13:43 CEST 2026
