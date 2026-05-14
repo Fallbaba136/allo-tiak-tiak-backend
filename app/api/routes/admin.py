@@ -70,6 +70,13 @@ def admin_get_riders(
             "payment_phone": r.payment_phone,
             "is_available": r.is_available,
             "is_verified": r.is_verified,
+            "is_blocked": r.is_blocked,
+            "kyc_status": r.kyc_status,
+            "kyc_rejection_reason": r.kyc_rejection_reason,
+            "cni_front_url": r.cni_front_url,
+            "cni_back_url": r.cni_back_url,
+            "selfie_url": r.selfie_url,
+            "permis_url": r.permis_url,
         })
     return result
 
