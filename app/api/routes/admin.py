@@ -313,3 +313,91 @@ def admin_rider_monthly_stats(
         "total_commission": round(total_commission, 2),
         "rider_net": round(rider_net, 2),
     }
+
+
+@router.get("/db/tables")
+def admin_db_tables(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from sqlalchemy import text
+    tables = ['users', 'rider_profiles', 'client_profiles', 'orders', 'otp_codes', 'rider_locations', 'disputes', 'reviews']
+    result = []
+    for t in tables:
+        count = db.execute(text(f"SELECT COUNT(*) FROM {t}")).scalar()
+        result.append({"table": t, "count": count})
+    return result
+
+
+@router.get("/db/table/{table_name}")
+def admin_db_table(
+    table_name: str,
+    page: int = 1,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from sqlalchemy import text
+    allowed = ['users', 'rider_profiles', 'client_profiles', 'orders', 'otp_codes', 'rider_locations', 'disputes', 'reviews']
+    if table_name not in allowed:
+        raise HTTPException(status_code=400, detail="Table non autorisée")
+    offset = (page - 1) * limit
+    rows = db.execute(text(f"SELECT * FROM {table_name} ORDER BY id DESC LIMIT {limit} OFFSET {offset}")).mappings().all()
+    total = db.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar()
+    return {
+        "table": table_name,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "rows": [dict(r) for r in rows]
+    }
+
+
+@router.patch("/db/user/{user_id}/role")
+def admin_change_user_role(
+    user_id: int,
+    role: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    if role not in ["client", "rider", "admin"]:
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    user.role = role
+    db.commit()
+    return {"message": f"Rôle mis à jour", "user_id": user_id, "role": role}
+
+
+@router.patch("/db/order/{order_id}/status")
+def admin_force_order_status(
+    order_id: int,
+    status: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    allowed = ["pending", "accepted", "in_progress", "delivered", "confirmed", "cancelled", "disputed"]
+    if status not in allowed:
+        raise HTTPException(status_code=400, detail="Statut invalide")
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    order.status = status
+    db.commit()
+    return {"message": f"Statut mis à jour", "order_id": order_id, "status": status}
+
+
+@router.patch("/db/rider/{user_id}/availability")
+def admin_force_rider_availability(
+    user_id: int,
+    is_available: bool,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.is_available = is_available
+    db.commit()
+    return {"message": "Disponibilité mise à jour", "user_id": user_id, "is_available": is_available}
