@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
+    # Resend email
+    RESEND_API_KEY: str = ""
+    ADMIN_EMAIL: str = ""
+
     # OTP
     OTP_TTL_MINUTES: int = 10
 

@@ -5,6 +5,7 @@ from app.models.user import User
 from app.models.rider_profile import RiderProfile
 from app.api.dependencies import get_current_user
 from app.services.cloudinary_service import upload_kyc_document
+from app.services.email_service import send_kyc_notification
 
 router = APIRouter()
 
@@ -51,6 +52,13 @@ async def upload_kyc_documents(
     profile.kyc_status = "submitted"
 
     db.commit()
+
+    # Notification email admin
+    send_kyc_notification(
+        rider_phone=current_user.phone,
+        rider_name=profile.full_name or "",
+        user_id=current_user.id,
+    )
 
     return {"message": "Documents soumis avec succès", "kyc_status": "submitted"}
 
