@@ -402,14 +402,4 @@ def admin_force_rider_availability(
     db.commit()
     return {"message": "Disponibilité mise à jour", "user_id": user_id, "is_available": is_available}
 
-@router.post("/test-email")
-def test_email(
-    _: None = Depends(verify_admin),
-):
-    from app.services.email_service import send_kyc_notification
-    send_kyc_notification(
-        rider_phone="+221700000001",
-        rider_name="Moussa Diop",
-        user_id=2,
-    )
-    return {"message": "Email de test envoyé"}
+    
