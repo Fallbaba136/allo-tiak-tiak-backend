@@ -147,3 +147,24 @@ async def upload_avatar(
     db.commit()
 
     return {"avatar_url": url}
+
+@router.get("/public/{user_id}")
+def get_rider_public_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Livreur introuvable")
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    return {
+        "user_id": user_id,
+        "phone": user.phone,
+        "full_name": profile.full_name,
+        "zone": profile.zone,
+        "services": profile.services,
+        "avatar_url": profile.avatar_url,
+        "is_available": profile.is_available,
+    }
