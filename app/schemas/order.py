@@ -40,6 +40,7 @@ class OrderOut(BaseModel):
     cancelled_at: datetime | None
     payment_confirmed_at: datetime | None
     created_at: datetime
+    delivery_photo_url: str | None = None
 
 class OrderStatusUpdate(BaseModel):
     status: Literal["accepted", "in_progress", "delivered", "cancelled", "disputed"]

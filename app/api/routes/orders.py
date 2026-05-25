@@ -13,6 +13,7 @@ from app.services.notification_service import send_order_notification
 from app.models.rider_profile import RiderProfile
 from app.services.sms_service import send_delivery_code_sms
 from app.services.payment_service import calculate_commission, get_payment_summary
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 router = APIRouter()
 
@@ -39,6 +40,7 @@ def order_to_out(o: Order) -> OrderOut:
         cancelled_at=o.cancelled_at,
         payment_confirmed_at=o.payment_confirmed_at,
         created_at=o.created_at,
+        delivery_photo_url=o.delivery_photo_url,
     )
 
 @router.post("/", response_model=OrderOut)
@@ -307,6 +309,36 @@ def confirm_transport(
     now = datetime.now(timezone.utc)
     order.status = "confirmed"
     order.confirmed_at = now
+    db.commit()
+    db.refresh(order)
+    return order_to_out(order)
+
+
+@router.post("/{order_id}/delivery-photo", response_model=OrderOut)
+async def upload_delivery_photo(
+    order_id: int,
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from fastapi import File
+    from app.services.cloudinary_service import upload_kyc_document
+
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Seuls les livreurs peuvent uploader une photo de livraison")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.rider_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
+
+    contents = await photo.read()
+    url = upload_kyc_document(contents, "delivery_photos", f"order_{order_id}_delivery")
+    order.delivery_photo_url = url
+    order.status = "delivered"
+    order.delivered_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(order)
     return order_to_out(order)
