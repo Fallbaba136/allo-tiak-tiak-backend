@@ -147,8 +147,11 @@ def update_order_status(
     if current_user.role == "rider":
         if order.rider_id is not None and order.rider_id != current_user.id:
             raise HTTPException(status_code=403, detail="Ce n'est pas votre livraison")
-        if payload.status not in ["accepted", "in_progress", "delivered"]:
+        if payload.status not in ["accepted", "in_progress", "delivered", "cancelled"]:
             raise HTTPException(status_code=403, detail="Action non autorisee pour le livreur")
+        if payload.status == "cancelled":
+            order.cancelled_at = now
+            order.rider_id = None
         if payload.status == "accepted":
             if order.rider_id is None:
                 order.rider_id = current_user.id
