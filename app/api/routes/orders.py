@@ -155,6 +155,9 @@ def update_order_status(
             order.cancelled_at = now
             order.rider_id = None
         if payload.status == "accepted":
+            rider_profile_check = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+            if rider_profile_check and not rider_profile_check.is_available:
+                raise HTTPException(status_code=403, detail="Vous devez etre disponible pour accepter une commande")
             if order.rider_id is None:
                 order.rider_id = current_user.id
             order.accepted_at = now
