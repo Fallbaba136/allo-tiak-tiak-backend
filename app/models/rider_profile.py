@@ -29,6 +29,7 @@ class RiderProfile(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     services: Mapped[str] = mapped_column(String(50), default="delivery")
     pricing: Mapped[str | None] = mapped_column(Text, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
 # JSON ex: {"Plateau→Almadies": 2000, "Plateau→Pikine": 1500}
     # delivery / transport / delivery,transport
 

@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.rider_profile import RiderProfile
 from app.schemas.rider import RiderUpsert, RiderOut, FCMTokenUpdate
 from app.core.config import settings
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ def profile_to_out(user: User, profile: RiderProfile) -> RiderOut:
         is_verified=profile.is_verified,
         services=profile.services,
         pricing=profile.pricing,
+        avatar_url=profile.avatar_url,
     )
 
 @router.post("/me/fcm-token")
@@ -53,6 +55,7 @@ def upsert_my_profile(
     profile.payment_phone = payload.payment_phone
     profile.services = payload.services
     profile.pricing = payload.pricing
+    profile.avatar_url = payload.avatar_url
 
     db.commit()
     db.refresh(profile)
@@ -123,3 +126,24 @@ def admin_verify_rider(
     profile.is_verified = True
     db.commit()
     return {"ok": True, "phone": phone, "is_verified": True}
+
+
+@router.post("/me/avatar")
+async def upload_avatar(
+    avatar: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.cloudinary_service import upload_kyc_document
+    from fastapi import File
+
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+
+    contents = await avatar.read()
+    url = upload_kyc_document(contents, "avatars", f"rider_{current_user.id}_avatar")
+    profile.avatar_url = url
+    db.commit()
+
+    return {"avatar_url": url}
