@@ -16,11 +16,11 @@ router = APIRouter()
 @router.post("/otp/start")
 def otp_start(payload: OTPStartRequest, db: Session = Depends(get_db)):
     phone = payload.phone.strip()
-    
+
     now_ts = int(time())
     db.query(OTPCode).filter(OTPCode.expires_at_ts < now_ts).delete()
     db.commit()
-    
+
     latest = (
         db.query(OTPCode)
         .filter(OTPCode.phone == phone)
@@ -28,7 +28,7 @@ def otp_start(payload: OTPStartRequest, db: Session = Depends(get_db)):
         .first()
     )
     if latest and (int(time()) - (latest.expires_at_ts - settings.OTP_TTL_MINUTES * 60)) < 60:
-        raise HTTPException(status_code=429, detail="Trop de demandes. Réessayez dans 60s.")
+        raise HTTPException(status_code=429, detail="Trop de demandes. Reessayez dans 60s.")
 
     code = f"{secrets.randbelow(10**6):06d}"
     code_h = hash_code(code)
@@ -69,6 +69,14 @@ def otp_verify(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
     if not user:
         user = User(phone=phone, is_phone_verified=True, role=payload.role)
         db.add(user)
+        db.flush()
+
+        if payload.role == "rider":
+            from app.models.rider_profile import RiderProfile
+            db.add(RiderProfile(user_id=user.id))
+        elif payload.role == "client":
+            from app.models.client_profile import ClientProfile
+            db.add(ClientProfile(user_id=user.id))
     else:
         user.is_phone_verified = True
         user.role = payload.role
