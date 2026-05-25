@@ -138,11 +138,46 @@ def admin_approve_kyc(
     profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profil introuvable")
+    
     profile.kyc_status = "approved"
     profile.is_verified = True
     profile.kyc_rejection_reason = None
     db.commit()
-    return {"message": "KYC approuvé", "user_id": user_id}
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    # Notification FCM push
+    if profile.fcm_token:
+        try:
+            from app.firebase.firebase_init import get_firebase_app
+            from firebase_admin import messaging
+            get_firebase_app()
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title="✅ Compte activé !",
+                    body="Votre dossier a été approuvé. Vous pouvez maintenant recevoir des commandes.",
+                ),
+                token=profile.fcm_token,
+            )
+            messaging.send(message)
+            print(f"[FCM] Notification approbation envoyée à {user.phone}")
+        except Exception as e:
+            print(f"[FCM] Erreur : {e}")
+
+    # SMS fallback
+    if user:
+        try:
+            from app.services.sms_service import get_sms_service
+            sms = get_sms_service()
+            sms.send(
+                f"Allo Tiak-Tiak : Votre compte a ete approuve ! Vous pouvez maintenant vous connecter et recevoir des commandes.",
+                [user.phone]
+            )
+            print(f"[SMS] Notification approbation envoyee a {user.phone}")
+        except Exception as e:
+            print(f"[SMS] Erreur : {e}")
+
+    return {"message": "KYC approuve", "user_id": user_id}
 
 
 @router.patch("/riders/{user_id}/kyc/reject")
