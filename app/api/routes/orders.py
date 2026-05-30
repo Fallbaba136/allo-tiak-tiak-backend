@@ -347,3 +347,37 @@ async def upload_delivery_photo(
     db.commit()
     db.refresh(order)
     return order_to_out(order)
+
+
+
+@router.delete("/{order_id}")
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "client":
+        raise HTTPException(status_code=403, detail="Reserve aux clients")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
+
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Impossible de supprimer une commande en cours")
+
+    # Vérifier qu'aucune proposition n'existe
+    from app.models.price_proposal import PriceProposal
+    proposals = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id,
+        PriceProposal.status == "pending"
+    ).count()
+    if proposals > 0:
+        raise HTTPException(status_code=400, detail="Des livreurs ont deja propose un prix — acceptez une offre ou attendez")
+
+    db.delete(order)
+    db.commit()
+    return {"message": "Commande supprimee", "order_id": order_id}
