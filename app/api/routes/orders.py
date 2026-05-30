@@ -41,6 +41,7 @@ def order_to_out(o: Order) -> OrderOut:
         payment_confirmed_at=o.payment_confirmed_at,
         created_at=o.created_at,
         delivery_photo_url=o.delivery_photo_url,
+        is_urgent=o.is_urgent,
     )
 
 @router.post("/", response_model=OrderOut)
@@ -67,6 +68,7 @@ def create_order(
         receiver_phone=payload.receiver_phone,
         amount=payload.amount,
         order_type=payload.order_type,
+        is_urgent=payload.is_urgent,
         status="pending",
     )
     db.add(order)

@@ -29,6 +29,7 @@ class Order(Base):
     delivered_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     confirmed_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_urgent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
 
     # Paiement

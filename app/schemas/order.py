@@ -11,6 +11,7 @@ class OrderCreate(BaseModel):
     receiver_phone: str | None = None
     amount: float
     order_type: Literal["delivery", "transport"] = "delivery"
+    is_urgent: bool = False
 
     @model_validator(mode="after")
     def check_fields(self):
@@ -41,6 +42,7 @@ class OrderOut(BaseModel):
     payment_confirmed_at: datetime | None
     created_at: datetime
     delivery_photo_url: str | None = None
+    is_urgent: bool = False
 
 class OrderStatusUpdate(BaseModel):
     status: Literal["accepted", "in_progress", "delivered", "cancelled", "disputed"]
