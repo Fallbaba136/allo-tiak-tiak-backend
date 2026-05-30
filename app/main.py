@@ -22,6 +22,8 @@ from app.models.review import Review  # noqa
 from app.api.routes.stats import router as stats_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.kyc import router as kyc_router
+from app.api.routes.proposals import router as proposals_router
+
 
 app = FastAPI(title="Allô Tiak-Tiak API", version="0.1.0")
 
@@ -48,3 +50,4 @@ app.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 app.include_router(stats_router, prefix="/stats", tags=["stats"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(kyc_router, prefix="/kyc", tags=["kyc"])
+app.include_router(proposals_router, tags=["proposals"])
