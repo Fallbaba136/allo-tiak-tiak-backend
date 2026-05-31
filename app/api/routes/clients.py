@@ -46,3 +46,18 @@ def upsert_my_profile(
         full_name=profile.full_name,
         address=profile.address,
     )
+
+@router.post("/me/fcm-token")
+def update_client_fcm_token(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "client":
+        raise HTTPException(status_code=403, detail="Reserve aux clients")
+    profile = db.query(ClientProfile).filter(ClientProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.fcm_token = token
+    db.commit()
+    return {"message": "FCM token mis a jour"}
