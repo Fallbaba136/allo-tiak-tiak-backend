@@ -14,7 +14,7 @@ from app.models.rider_profile import RiderProfile
 from app.services.sms_service import send_delivery_code_sms
 from app.services.payment_service import calculate_commission, get_payment_summary
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from app.models.price_proposal import PriceProposal
+    from app.models.price_proposal import PriceProposal
 
 router = APIRouter()
 
@@ -368,11 +368,27 @@ def delete_order(
         raise HTTPException(status_code=400, detail="Impossible de supprimer une commande en cours")
 
     # Annuler toutes les propositions existantes
-    from app.models.price_proposal import PriceProposal
-    db.query(PriceProposal).filter(
-        PriceProposal.order_id == order_id
-    ).delete()
 
+    # Notifier les livreurs dont la proposition est annulée
+    proposals = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id
+    ).all()
+    for p in proposals:
+        rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == p.rider_id).first()
+        if rider_profile and rider_profile.fcm_token:
+            try:
+                send_order_notification(
+                    fcm_token=rider_profile.fcm_token,
+                    order_id=order_id,
+                    pickup="Commande annulee par le client",
+                    dropoff="La commande #" + str(order_id) + " a ete supprimee",
+                )
+            except Exception as e:
+                print(f"[FCM] Erreur notification: {e}")
+
+
+        from app.models.price_proposal import PriceProposal
+    db.query(PriceProposal).filter(PriceProposal.order_id == order_id).delete()
     db.delete(order)
     db.commit()
     return {"message": "Commande supprimee", "order_id": order_id}
