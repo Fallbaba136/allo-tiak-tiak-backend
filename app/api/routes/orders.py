@@ -14,7 +14,7 @@ from app.models.rider_profile import RiderProfile
 from app.services.sms_service import send_delivery_code_sms
 from app.services.payment_service import calculate_commission, get_payment_summary
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-    from app.models.price_proposal import PriceProposal
+from app.models.price_proposal import PriceProposal
 
 router = APIRouter()
 
@@ -387,7 +387,6 @@ def delete_order(
                 print(f"[FCM] Erreur notification: {e}")
 
 
-        from app.models.price_proposal import PriceProposal
     db.query(PriceProposal).filter(PriceProposal.order_id == order_id).delete()
     db.delete(order)
     db.commit()
