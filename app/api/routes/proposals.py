@@ -183,3 +183,20 @@ def accept_proposal(
             print(f"[FCM] Erreur notification livreur: {e}")
 
     return {"message": "Proposition acceptee", "order_id": order_id, "amount": proposal.proposed_price}
+
+
+
+@router.get("/my-proposals")
+def get_my_proposals(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Reserve aux livreurs")
+    
+    proposals = db.query(PriceProposal).filter(
+        PriceProposal.rider_id == current_user.id,
+        PriceProposal.status == "pending",
+    ).all()
+    
+    return [{"order_id": p.order_id, "proposed_price": p.proposed_price} for p in proposals]
