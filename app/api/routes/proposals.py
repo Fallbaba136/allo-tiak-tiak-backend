@@ -150,6 +150,25 @@ def accept_proposal(
 
     db.commit()
 
+    # Notifier les livreurs rejetés
+    rejected_proposals = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id,
+        PriceProposal.id != proposal_id,
+    ).all()
+    
+    for rp in rejected_proposals:
+        rejected_profile = db.query(RiderProfile).filter(RiderProfile.user_id == rp.rider_id).first()
+        if rejected_profile and rejected_profile.fcm_token:
+            try:
+                send_order_notification(
+                    fcm_token=rejected_profile.fcm_token,
+                    order_id=order_id,
+                    pickup="Commande attribuee a un autre livreur",
+                    dropoff="Votre offre n'a pas ete retenue",
+                )
+            except Exception as e:
+                print(f"[FCM] Erreur notification rejet: {e}")
+
     # Notifier le livreur choisi
     rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == proposal.rider_id).first()
     if rider_profile and rider_profile.fcm_token:
