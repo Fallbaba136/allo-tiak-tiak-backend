@@ -157,50 +157,50 @@ def update_order_status(
         if payload.status == "cancelled":
             order.cancelled_at = now
             order.rider_id = None
-if payload.status == "accepted":
-    rider_profile_check = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
-    if rider_profile_check and not rider_profile_check.is_available:
-        raise HTTPException(status_code=403, detail="Vous devez etre disponible pour accepter une commande")
-    
-    # Verrou anti double-acceptation
-    from sqlalchemy import text
-    result = db.execute(
-        text("UPDATE orders SET status='accepted', rider_id=:rider_id, accepted_at=NOW() WHERE id=:order_id AND status='pending' AND (rider_id IS NULL OR rider_id=:rider_id)"),
-        {"rider_id": current_user.id, "order_id": order_id}
-    )
-    db.commit()
-    
-    if result.rowcount == 0:
-        raise HTTPException(status_code=409, detail="Cette commande a deja ete acceptee par un autre livreur")
-    
-    db.refresh(order)
-    
-    if order.order_type == "delivery":
-        code = f"{secrets.randbelow(10**6):06d}"
-        order.delivery_code = code
-        order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
-        db.commit()
-        send_delivery_code_sms(
-            receiver_phone=order.receiver_phone,
-            code=code,
-            order_id=order.id,
+    if payload.status == "accepted":
+        rider_profile_check = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+        if rider_profile_check and not rider_profile_check.is_available:
+                raise HTTPException(status_code=403, detail="Vous devez etre disponible pour accepter une commande")
+        
+        # Verrou anti double-acceptation
+        from sqlalchemy import text
+        result = db.execute(
+                text("UPDATE orders SET status='accepted', rider_id=:rider_id, accepted_at=NOW() WHERE id=:order_id AND status='pending' AND (rider_id IS NULL OR rider_id=:rider_id)"),
+                {"rider_id": current_user.id, "order_id": order_id}
         )
-    rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
-    if rider_profile and rider_profile.fcm_token:
-        try:
-            send_order_notification(
-                fcm_token=rider_profile.fcm_token,
-                order_id=order.id,
-                pickup=order.pickup_address,
-                dropoff=order.delivery_address,
-            )
-        except Exception as e:
-            print(f"[FCM] Erreur notification: {e}")
-    
-    order.status = payload.status
-    db.commit()
-    db.refresh(order)
-    return order_to_out(order)
+        db.commit()
+        
+        if result.rowcount == 0:
+                raise HTTPException(status_code=409, detail="Cette commande a deja ete acceptee par un autre livreur")
+        
+        db.refresh(order)
+        
+        if order.order_type == "delivery":
+                code = f"{secrets.randbelow(10**6):06d}"
+                order.delivery_code = code
+                order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
+                db.commit()
+                send_delivery_code_sms(
+                        receiver_phone=order.receiver_phone,
+                        code=code,
+                        order_id=order.id,
+                )
+        rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+        if rider_profile and rider_profile.fcm_token:
+                try:
+                        send_order_notification(
+                                fcm_token=rider_profile.fcm_token,
+                                order_id=order.id,
+                                pickup=order.pickup_address,
+                                dropoff=order.delivery_address,
+                        )
+                except Exception as e:
+                        print(f"[FCM] Erreur notification: {e}")
+        
+        order.status = payload.status
+        db.commit()
+        db.refresh(order)
+        return order_to_out(order)
 
 @router.post("/{order_id}/verify-delivery", response_model=OrderOut)
 def verify_delivery_code(
