@@ -43,6 +43,7 @@ def order_to_out(o: Order) -> OrderOut:
         created_at=o.created_at,
         delivery_photo_url=o.delivery_photo_url,
         is_urgent=o.is_urgent,
+        broadcast_expires_at=o.broadcast_expires_at,
     )
 
 @router.post("/", response_model=OrderOut)
@@ -69,6 +70,7 @@ def create_order(
         receiver_phone=payload.receiver_phone,
         amount=payload.amount,
         order_type=payload.order_type,
+        broadcast_expires_at=int(__import__("time").time()) + 30 * 60,
         is_urgent=payload.is_urgent,
         status="pending",
     )

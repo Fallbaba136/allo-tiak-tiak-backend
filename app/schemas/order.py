@@ -43,6 +43,7 @@ class OrderOut(BaseModel):
     created_at: datetime
     delivery_photo_url: str | None = None
     is_urgent: bool = False
+    broadcast_expires_at: int | None = None
 
 class OrderStatusUpdate(BaseModel):
     status: Literal["accepted", "in_progress", "delivered", "cancelled", "disputed"]
