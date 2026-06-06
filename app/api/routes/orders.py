@@ -70,7 +70,7 @@ def create_order(
         receiver_phone=payload.receiver_phone,
         amount=payload.amount,
         order_type=payload.order_type,
-        broadcast_expires_at=int(__import__("time").time()) + 2 * 60,
+        broadcast_expires_at=int(__import__("time").time()) + 30 * 60,
         is_urgent=payload.is_urgent,
         status="pending",
     )
@@ -401,3 +401,23 @@ def delete_order(
     db.delete(order)
     db.commit()
     return {"message": "Commande supprimee", "order_id": order_id}
+
+
+
+@router.post("/{order_id}/renew")
+def renew_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from time import time
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    if order.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Commande non disponible")
+    order.broadcast_expires_at = int(time()) + 30 * 60
+    db.commit()
+    return {"message": "Commande renouvelee", "order_id": order_id}
