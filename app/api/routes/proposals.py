@@ -15,6 +15,7 @@ router = APIRouter()
 @router.post("/orders/{order_id}/propose-price")
 def propose_price(
     order_id: int,
+    current_location: str = "",
     proposed_price: float,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -49,6 +50,7 @@ def propose_price(
         order_id=order_id,
         rider_id=current_user.id,
         proposed_price=proposed_price,
+        current_location=current_location,
         status="pending",
     )
     db.add(proposal)
@@ -102,6 +104,7 @@ def get_proposals(
             "rider_avatar": rider_profile.avatar_url if rider_profile else None,
             "rider_services": rider_profile.services if rider_profile else None,
             "proposed_price": p.proposed_price,
+            "current_location": p.current_location,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         })
 
