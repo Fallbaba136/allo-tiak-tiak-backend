@@ -70,7 +70,7 @@ def create_order(
         receiver_phone=payload.receiver_phone,
         amount=payload.amount,
         order_type=payload.order_type,
-        broadcast_expires_at=int(__import__("time").time()) + 30 * 60,
+        broadcast_expires_at=int(__import__("time").time()) + 2 * 60,
         is_urgent=payload.is_urgent,
         status="pending",
     )
