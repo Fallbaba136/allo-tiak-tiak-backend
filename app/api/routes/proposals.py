@@ -15,8 +15,8 @@ router = APIRouter()
 @router.post("/orders/{order_id}/propose-price")
 def propose_price(
     order_id: int,
-    current_location: str = "",
     proposed_price: float,
+    current_location: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
