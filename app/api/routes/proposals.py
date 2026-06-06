@@ -140,6 +140,18 @@ def accept_proposal(
     order.amount = proposal.proposed_price
     order.status = "accepted"
     order.accepted_at = now
+    if order.order_type == "delivery":
+            import secrets
+            from time import time
+            code = f"{secrets.randbelow(10**6):06d}"
+            order.delivery_code = code
+            order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
+            from app.services.sms_service import send_delivery_code_sms
+            send_delivery_code_sms(
+                receiver_phone=order.receiver_phone,
+                code=code,
+                order_id=order.id,
+            )
     proposal.status = "accepted"
 
     # Rejeter les autres propositions
