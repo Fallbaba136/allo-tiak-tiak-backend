@@ -202,7 +202,14 @@ def update_order_status(
         order.status = payload.status
         db.commit()
         db.refresh(order)
-        return order_to_out(order)
+    if payload.status == "in_progress":
+        order.picked_up_at = now
+    elif payload.status == "delivered":
+        order.delivered_at = now
+    order.status = payload.status
+    db.commit()
+    db.refresh(order)
+    return order_to_out(order)
 
 @router.post("/{order_id}/verify-delivery", response_model=OrderOut)
 def verify_delivery_code(
