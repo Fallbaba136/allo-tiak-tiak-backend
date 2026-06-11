@@ -18,7 +18,20 @@ from app.models.price_proposal import PriceProposal
 
 router = APIRouter()
 
-def order_to_out(o: Order) -> OrderOut:
+def order_to_out(o: Order, db=None) -> OrderOut:
+    client_name = None
+    client_phone = None
+    client_address = None
+    if db is not None:
+        from app.models.client_profile import ClientProfile
+        from app.models.user import User as UserModel
+        cp = db.query(ClientProfile).filter(ClientProfile.user_id == o.client_id).first()
+        cu = db.query(UserModel).filter(UserModel.id == o.client_id).first()
+        if cp:
+            client_name = cp.full_name
+            client_address = cp.address
+        if cu:
+            client_phone = cu.phone
     return OrderOut(
         id=o.id,
         client_id=o.client_id,
@@ -44,6 +57,9 @@ def order_to_out(o: Order) -> OrderOut:
         delivery_photo_url=o.delivery_photo_url,
         is_urgent=o.is_urgent,
         broadcast_expires_at=o.broadcast_expires_at,
+        client_name=client_name,
+        client_phone=client_phone,
+        client_address=client_address,
     )
 
 @router.post("/", response_model=OrderOut)
@@ -99,7 +115,7 @@ def create_order(
                 except Exception as e:
                     print(f"[FCM] Erreur notification livreur {rp.user_id}: {e}")
 
-    return order_to_out(order)
+    return order_to_out(order, db)
 
 @router.get("/my-orders", response_model=list[OrderOut])
 def get_my_orders(
@@ -112,7 +128,7 @@ def get_my_orders(
         orders = db.query(Order).filter(Order.rider_id == current_user.id).all()
     else:
         raise HTTPException(status_code=403, detail="Acces refuse")
-    return [order_to_out(o) for o in orders]
+    return [order_to_out(o, db) for o in orders]
 
 @router.get("/pending", response_model=list[OrderOut])
 def get_pending_orders(
@@ -128,7 +144,7 @@ def get_pending_orders(
         Order.status == "pending",
         Order.rider_id == None,
     ).order_by(Order.created_at.desc()).all()
-    return [order_to_out(o) for o in orders]
+    return [order_to_out(o, db) for o in orders]
 
 @router.patch("/{order_id}/status", response_model=OrderOut)
 def update_order_status(
@@ -209,7 +225,7 @@ def update_order_status(
     order.status = payload.status
     db.commit()
     db.refresh(order)
-    return order_to_out(order)
+    return order_to_out(order, db)
 
 @router.post("/{order_id}/verify-delivery", response_model=OrderOut)
 def verify_delivery_code(
@@ -246,7 +262,7 @@ def verify_delivery_code(
     order.delivery_code = None
     db.commit()
     db.refresh(order)
-    return order_to_out(order)
+    return order_to_out(order, db)
 
 @router.get("/{order_id}/payment-summary")
 def get_payment_summary_route(
@@ -305,7 +321,7 @@ def confirm_payment(
 
     db.commit()
     db.refresh(order)
-    return order_to_out(order)
+    return order_to_out(order, db)
 
 @router.post("/{order_id}/confirm-transport", response_model=OrderOut)
 def confirm_transport(
@@ -334,7 +350,7 @@ def confirm_transport(
     order.confirmed_at = now
     db.commit()
     db.refresh(order)
-    return order_to_out(order)
+    return order_to_out(order, db)
 
 
 @router.post("/{order_id}/delivery-photo", response_model=OrderOut)
@@ -364,7 +380,7 @@ async def upload_delivery_photo(
     order.delivered_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(order)
-    return order_to_out(order)
+    return order_to_out(order, db)
 @router.delete("/{order_id}")
 def delete_order(
     order_id: int,

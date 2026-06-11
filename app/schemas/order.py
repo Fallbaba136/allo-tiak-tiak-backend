@@ -44,6 +44,9 @@ class OrderOut(BaseModel):
     delivery_photo_url: str | None = None
     is_urgent: bool = False
     broadcast_expires_at: int | None = None
+    client_name: str | None = None
+    client_phone: str | None = None
+    client_address: str | None = None
 
 class OrderStatusUpdate(BaseModel):
     status: Literal["accepted", "in_progress", "delivered", "cancelled", "disputed"]
