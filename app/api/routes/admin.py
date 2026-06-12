@@ -20,10 +20,26 @@ def verify_admin(x_admin_secret: str | None = Header(default=None)):
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Accès admin refusé")
 
-def order_to_out(o: Order) -> dict:
+def order_to_out(o: Order, db=None) -> dict:
+    client_name = None
+    client_phone = None
+    client_address = None
+    if db is not None:
+        from app.models.client_profile import ClientProfile
+        from app.models.user import User as UserModel
+        cp = db.query(ClientProfile).filter(ClientProfile.user_id == o.client_id).first()
+        cu = db.query(UserModel).filter(UserModel.id == o.client_id).first()
+        if cp:
+            client_name = cp.full_name
+            client_address = cp.address
+        if cu:
+            client_phone = cu.phone
     return {
         "id": o.id,
         "client_id": o.client_id,
+        "client_name": client_name,
+        "client_phone": client_phone,
+        "client_address": client_address,
         "rider_id": o.rider_id,
         "pickup_address": o.pickup_address,
         "delivery_address": o.delivery_address,
@@ -42,6 +58,7 @@ def order_to_out(o: Order) -> dict:
         "cancelled_at": o.cancelled_at,
         "payment_confirmed_at": o.payment_confirmed_at,
         "created_at": o.created_at,
+        "is_urgent": o.is_urgent,
     }
 
 @router.get("/orders")
@@ -50,7 +67,7 @@ def admin_get_orders(
     _: None = Depends(verify_admin),
 ):
     orders = db.query(Order).order_by(Order.created_at.desc()).all()
-    return [order_to_out(o) for o in orders]
+    return [order_to_out(o, db) for o in orders]
 
 @router.get("/riders")
 def admin_get_riders(
