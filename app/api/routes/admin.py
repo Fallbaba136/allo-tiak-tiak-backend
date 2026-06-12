@@ -455,3 +455,66 @@ def admin_force_rider_availability(
     return {"message": "Disponibilité mise à jour", "user_id": user_id, "is_available": is_available}
 
     
+@router.delete("/db/clean/cancelled")
+def clean_cancelled_orders(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.price_proposal import PriceProposal
+    orders = db.query(Order).filter(Order.status == "cancelled").all()
+    count = 0
+    for o in orders:
+        db.query(PriceProposal).filter(PriceProposal.order_id == o.id).delete()
+        db.delete(o)
+        count += 1
+    db.commit()
+    return {"deleted": count, "message": f"{count} commande(s) annulée(s) supprimée(s)"}
+
+@router.delete("/db/clean/expired-pending")
+def clean_expired_pending(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.price_proposal import PriceProposal
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    orders = db.query(Order).filter(
+        Order.status == "pending",
+        Order.created_at < cutoff,
+    ).all()
+    count = 0
+    for o in orders:
+        db.query(PriceProposal).filter(PriceProposal.order_id == o.id).delete()
+        db.delete(o)
+        count += 1
+    db.commit()
+    return {"deleted": count, "message": f"{count} commande(s) expirée(s) supprimée(s)"}
+
+@router.delete("/db/clean/orphan-proposals")
+def clean_orphan_proposals(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.price_proposal import PriceProposal
+    result = db.query(PriceProposal).filter(
+        PriceProposal.status.in_(["rejected", "accepted"]),
+    ).delete()
+    db.commit()
+    return {"deleted": result, "message": f"{result} proposition(s) supprimée(s)"}
+
+@router.delete("/db/clean/test-orders")
+def clean_test_orders(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.price_proposal import PriceProposal
+    orders = db.query(Order).filter(
+        Order.status.notin_(["confirmed"])
+    ).all()
+    count = 0
+    for o in orders:
+        db.query(PriceProposal).filter(PriceProposal.order_id == o.id).delete()
+        db.delete(o)
+        count += 1
+    db.commit()
+    return {"deleted": count, "message": f"{count} commande(s) supprimée(s)"}
