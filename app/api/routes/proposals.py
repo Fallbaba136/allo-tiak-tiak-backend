@@ -215,3 +215,29 @@ def get_my_proposals(
     ).all()
     
     return [{"order_id": p.order_id, "proposed_price": p.proposed_price} for p in proposals]
+@router.get("/orders/{order_id}/proposals-admin")
+def get_proposals_admin(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    proposals = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id,
+    ).all()
+
+    result = []
+    for p in proposals:
+        rider = db.query(User).filter(User.id == p.rider_id).first()
+        rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == p.rider_id).first()
+        result.append({
+            "proposal_id": p.id,
+            "rider_id": p.rider_id,
+            "rider_name": rider_profile.full_name if rider_profile else None,
+            "rider_phone": rider.phone if rider else None,
+            "proposed_price": p.proposed_price,
+            "current_location": p.current_location,
+            "status": p.status,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        })
+
+    return sorted(result, key=lambda x: x["proposed_price"])
