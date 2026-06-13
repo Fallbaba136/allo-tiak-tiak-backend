@@ -32,6 +32,7 @@ class Order(Base):
     confirmed_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     counter_price: Mapped[float | None] = mapped_column(nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     counter_price_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_urgent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     

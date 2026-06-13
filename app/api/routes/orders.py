@@ -58,6 +58,7 @@ def order_to_out(o: Order, db=None) -> OrderOut:
         is_urgent=o.is_urgent,
         broadcast_expires_at=o.broadcast_expires_at,
         counter_price=o.counter_price,
+        cancellation_reason=o.cancellation_reason,
         client_name=client_name,
         client_phone=client_phone,
         client_address=client_address,
@@ -167,6 +168,7 @@ def update_order_status(
             raise HTTPException(status_code=403, detail="Action non autorisee pour le client")
         if payload.status == "cancelled":
             order.cancelled_at = now
+            order.cancellation_reason = payload.cancellation_reason
 
     if current_user.role == "rider":
         if order.rider_id is not None and order.rider_id != current_user.id:
@@ -176,6 +178,7 @@ def update_order_status(
         if payload.status == "cancelled":
             order.cancelled_at = now
             order.rider_id = None
+            order.cancellation_reason = payload.cancellation_reason
     if payload.status == "accepted":
         rider_profile_check = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
         if rider_profile_check and not rider_profile_check.is_available:

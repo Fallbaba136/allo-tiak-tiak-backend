@@ -46,11 +46,13 @@ class OrderOut(BaseModel):
     broadcast_expires_at: int | None = None
     client_name: str | None = None
     counter_price: float | None = None
+    cancellation_reason: str | None = None
     client_phone: str | None = None
     client_address: str | None = None
 
 class OrderStatusUpdate(BaseModel):
     status: Literal["accepted", "in_progress", "delivered", "cancelled", "disputed"]
+    cancellation_reason: str | None = None
 
 class DeliveryCodeVerify(BaseModel):
     code: str
