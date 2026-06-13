@@ -262,6 +262,12 @@ def counter_propose(
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="Commande non disponible")
 
+    # Sauvegarder le contre-prix
+    from datetime import datetime, timezone
+    order.counter_price = counter_price
+    order.counter_price_at = datetime.now(timezone.utc)
+    db.commit()
+
     # Notifier tous les livreurs qui ont proposé
     proposals = db.query(PriceProposal).filter(
         PriceProposal.order_id == order_id,

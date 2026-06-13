@@ -45,6 +45,7 @@ class OrderOut(BaseModel):
     is_urgent: bool = False
     broadcast_expires_at: int | None = None
     client_name: str | None = None
+    counter_price: float | None = None
     client_phone: str | None = None
     client_address: str | None = None
 

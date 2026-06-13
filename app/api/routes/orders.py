@@ -57,6 +57,7 @@ def order_to_out(o: Order, db=None) -> OrderOut:
         delivery_photo_url=o.delivery_photo_url,
         is_urgent=o.is_urgent,
         broadcast_expires_at=o.broadcast_expires_at,
+        counter_price=o.counter_price,
         client_name=client_name,
         client_phone=client_phone,
         client_address=client_address,
