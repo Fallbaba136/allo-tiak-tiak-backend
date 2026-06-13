@@ -241,3 +241,44 @@ def get_proposals_admin(
         })
 
     return sorted(result, key=lambda x: x["proposed_price"])
+
+@router.post("/orders/{order_id}/counter-propose")
+def counter_propose(
+    order_id: int,
+    counter_price: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "client":
+        raise HTTPException(status_code=403, detail="Reserve aux clients")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
+
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Commande non disponible")
+
+    # Notifier tous les livreurs qui ont proposé
+    proposals = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id,
+        PriceProposal.status == "pending",
+    ).all()
+
+    for p in proposals:
+        rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == p.rider_id).first()
+        if rider_profile and rider_profile.fcm_token:
+            try:
+                send_order_notification(
+                    fcm_token=rider_profile.fcm_token,
+                    order_id=order_id,
+                    pickup=f"Contre-proposition: {counter_price} FCFA",
+                    dropoff=f"Le client propose {counter_price} FCFA",
+                )
+            except Exception as e:
+                print(f"[FCM] Erreur: {e}")
+
+    return {"message": "Contre-proposition envoyee", "counter_price": counter_price}
