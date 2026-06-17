@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timezone
 
 from app.db.session import get_db
@@ -7,6 +8,7 @@ from app.models.user import User
 from app.models.order import Order
 from app.models.price_proposal import PriceProposal
 from app.models.rider_profile import RiderProfile
+from app.models.review import Review
 from app.api.dependencies import get_current_user
 from app.services.notification_service import send_order_notification
 
@@ -95,6 +97,7 @@ def get_proposals(
     for p in proposals:
         rider = db.query(User).filter(User.id == p.rider_id).first()
         rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == p.rider_id).first()
+        rating_data = db.query(func.avg(Review.rating).label("avg_rating"), func.count(Review.id).label("total")).filter(Review.rider_id == p.rider_id).first()
         result.append({
             "proposal_id": p.id,
             "rider_id": p.rider_id,
@@ -103,6 +106,8 @@ def get_proposals(
             "rider_zone": rider_profile.zone if rider_profile else None,
             "rider_avatar": rider_profile.avatar_url if rider_profile else None,
             "rider_services": rider_profile.services if rider_profile else None,
+            "rider_rating": round(float(rating_data.avg_rating), 1) if rating_data.avg_rating else None,
+            "rider_rating_count": rating_data.total or 0,
             "proposed_price": p.proposed_price,
             "current_location": p.current_location,
             "created_at": p.created_at.isoformat() if p.created_at else None,
