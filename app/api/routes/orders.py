@@ -157,7 +157,13 @@ def get_my_orders(
     if current_user.role == "client":
         orders = db.query(Order).filter(Order.client_id == current_user.id).all()
     elif current_user.role == "rider":
-        orders = db.query(Order).filter(Order.rider_id == current_user.id).all()
+        from sqlalchemy import or_
+        orders = db.query(Order).filter(
+            or_(
+                Order.rider_id == current_user.id,
+                Order.cancelled_by_rider_id == current_user.id,
+            )
+        ).all()
     else:
         raise HTTPException(status_code=403, detail="Acces refuse")
     return [order_to_out(o, db) for o in orders]
@@ -207,6 +213,7 @@ def update_order_status(
             raise HTTPException(status_code=403, detail="Action non autorisee pour le livreur")
         if payload.status == "cancelled":
             order.cancelled_at = now
+            order.cancelled_by_rider_id = order.rider_id
             order.rider_id = None
             order.cancellation_reason = payload.cancellation_reason
     if payload.status == "accepted":
