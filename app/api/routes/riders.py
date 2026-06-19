@@ -157,7 +157,7 @@ def admin_verify_rider(
 async def upload_avatar(
     avatar: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(gett_user),
+    current_user: User = Depends(get_current_user),
 ):
     from app.services.cloudinary_service import upload_kyc_document
     from fastapi import File
