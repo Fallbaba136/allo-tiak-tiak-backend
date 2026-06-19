@@ -18,7 +18,37 @@ from app.models.price_proposal import PriceProposal
 
 router = APIRouter()
 
+CONFIRM_WINDOW_SECONDS = 30 * 60  # delai avant auto-confirmation apres "delivered"
+
+
+def confirm_order(order: Order, db: Session, now: datetime = None) -> Order:
+    """Passe la commande en 'confirmed' et calcule la commission une seule fois,
+    quel que soit le chemin qui mene a la confirmation (code, client, ou auto-confirm)."""
+    if order.status == "confirmed":
+        return order
+    if now is None:
+        now = datetime.now(timezone.utc)
+    order.status = "confirmed"
+    order.confirmed_at = now
+    if not order.commission:
+        order.commission = calculate_commission(order.amount)
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+def maybe_auto_confirm(order: Order, db: Session) -> Order:
+    """Si la commande est toujours 'delivered' et que le delai de confirmation
+    est depasse, on la confirme automatiquement (le client n'a plus besoin de cliquer)."""
+    if order.status == "delivered" and order.confirm_deadline is not None:
+        if int(time()) > order.confirm_deadline:
+            confirm_order(order, db)
+    return order
+
+
 def order_to_out(o: Order, db=None) -> OrderOut:
+    if db is not None:
+        maybe_auto_confirm(o, db)
     client_name = None
     client_phone = None
     client_address = None
@@ -226,6 +256,7 @@ def update_order_status(
         order.picked_up_at = now
     elif payload.status == "delivered":
         order.delivered_at = now
+        order.confirm_deadline = int(time()) + CONFIRM_WINDOW_SECONDS
     order.status = payload.status
     db.commit()
     db.refresh(order)
@@ -261,11 +292,8 @@ def verify_delivery_code(
         raise HTTPException(status_code=400, detail="Code incorrect")
 
     now = datetime.now(timezone.utc)
-    order.status = "confirmed"
-    order.confirmed_at = now
     order.delivery_code = None
-    db.commit()
-    db.refresh(order)
+    confirm_order(order, db, now)
     return order_to_out(order, db)
 
 @router.get("/{order_id}/payment-summary")
@@ -320,7 +348,8 @@ def confirm_payment(
     now = datetime.now(timezone.utc)
     order.payment_method = payload.payment_method
     order.payment_status = "paid"
-    order.commission = calculate_commission(order.amount)
+    if not order.commission:
+        order.commission = calculate_commission(order.amount)
     order.payment_confirmed_at = now
 
     db.commit()
@@ -350,10 +379,7 @@ def confirm_transport(
         raise HTTPException(status_code=400, detail="Le trajet n'est pas encore termine")
 
     now = datetime.now(timezone.utc)
-    order.status = "confirmed"
-    order.confirmed_at = now
-    db.commit()
-    db.refresh(order)
+    confirm_order(order, db, now)
     return order_to_out(order, db)
 
 
@@ -382,6 +408,7 @@ async def upload_delivery_photo(
     order.delivery_photo_url = url
     order.status = "delivered"
     order.delivered_at = datetime.now(timezone.utc)
+    order.confirm_deadline = int(time()) + CONFIRM_WINDOW_SECONDS
     db.commit()
     db.refresh(order)
     return order_to_out(order, db)
@@ -404,9 +431,6 @@ def delete_order(
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="Impossible de supprimer une commande en cours")
 
-    # Annuler toutes les propositions existantes
-
-    # Notifier les livreurs dont la proposition est annulée
     proposals = db.query(PriceProposal).filter(
         PriceProposal.order_id == order_id
     ).all()

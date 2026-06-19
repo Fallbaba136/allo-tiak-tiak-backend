@@ -20,6 +20,7 @@ class Order(Base):
     delivery_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
     delivery_code_expires_at: Mapped[int | None] = mapped_column(nullable=True)  # epoch seconds
     broadcast_expires_at: Mapped[int | None] = mapped_column(nullable=True)  # epoch seconds
+    confirm_deadline: Mapped[int | None] = mapped_column(nullable=True)
 
     status: Mapped[str] = mapped_column(String(30), default="pending")
     # pending / accepted / in_progress / delivered / confirmed / cancelled / disputed
