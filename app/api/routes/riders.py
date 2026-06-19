@@ -22,6 +22,7 @@ class LocationUpdate(BaseModel):
 def profile_to_out(user: User, profile: RiderProfile) -> RiderOut:
     return RiderOut(
         phone=user.phone,
+        user_id=user.id,
         full_name=profile.full_name,
         zone=profile.zone,
         payment_provider=profile.payment_provider,

@@ -11,6 +11,7 @@ class RiderUpsert(BaseModel):
 
 class RiderOut(BaseModel):
     phone: str
+    user_id: int
     full_name: str | None
     zone: str | None
     payment_provider: str | None
@@ -34,6 +35,7 @@ class RiderUpsert(BaseModel):
 
 class RiderOut(BaseModel):
     phone: str
+    user_id: int
     full_name: str | None
     zone: str | None
     payment_provider: str | None
