@@ -184,6 +184,29 @@ def get_rider_public_profile(
     profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profil introuvable")
+    from app.models.order import Order
+    from app.models.review import Review
+    from sqlalchemy import func as sqlfunc
+
+    completed_count = db.query(Order).filter(
+        Order.rider_id == user_id,
+        Order.status == "confirmed",
+    ).count()
+
+    cancelled_count = db.query(Order).filter(
+        Order.cancelled_by_rider_id == user_id,
+    ).count()
+
+    rating_data = db.query(
+        sqlfunc.avg(Review.rating).label("avg_rating"),
+        sqlfunc.count(Review.id).label("total"),
+    ).filter(Review.rider_id == user_id).first()
+
+    recent_reviews = db.query(Review).filter(
+        Review.rider_id == user_id,
+        Review.comment.isnot(None),
+    ).order_by(Review.created_at.desc()).limit(5).all()
+
     return {
         "user_id": user_id,
         "phone": user.phone,
@@ -192,4 +215,12 @@ def get_rider_public_profile(
         "services": profile.services,
         "avatar_url": profile.avatar_url,
         "is_available": profile.is_available,
+        "completed_orders": completed_count,
+        "cancelled_orders": cancelled_count,
+        "average_rating": round(float(rating_data.avg_rating), 1) if rating_data.avg_rating else None,
+        "total_reviews": rating_data.total or 0,
+        "recent_reviews": [
+            {"rating": r.rating, "comment": r.comment, "created_at": r.created_at.isoformat() if r.created_at else None}
+            for r in recent_reviews
+        ],
     }
