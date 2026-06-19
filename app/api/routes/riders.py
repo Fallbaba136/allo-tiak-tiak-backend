@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from app.api.dependencies import get_current_user
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.models.user import User
@@ -10,6 +12,12 @@ from app.core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 
 router = APIRouter()
+
+
+class LocationUpdate(BaseModel):
+    lat: float
+    lng: float
+
 
 def profile_to_out(user: User, profile: RiderProfile) -> RiderOut:
     return RiderOut(
@@ -37,6 +45,23 @@ def update_fcm_token(
     profile.fcm_token = payload.fcm_token
     db.commit()
     return {"ok": True, "message": "FCM token enregistré"}
+
+@router.post("/me/location")
+def update_my_location(
+    payload: LocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Reserve aux livreurs")
+    profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    profile.current_lat = payload.lat
+    profile.current_lng = payload.lng
+    profile.location_updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True}
 
 @router.put("/me", response_model=RiderOut)
 def upsert_my_profile(
@@ -132,7 +157,7 @@ def admin_verify_rider(
 async def upload_avatar(
     avatar: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(gett_user),
 ):
     from app.services.cloudinary_service import upload_kyc_document
     from fastapi import File

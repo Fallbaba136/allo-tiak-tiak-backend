@@ -44,3 +44,33 @@ def send_kyc_notification(rider_phone: str, rider_name: str, user_id: int):
         print(f"[EMAIL] Notification KYC envoyée pour {rider_phone}")
     except Exception as e:
         print(f"[EMAIL] Erreur : {e}")
+
+
+def send_kyc_approved_notification(rider_phone: str, rider_name: str):
+    if not settings.RESEND_API_KEY:
+        print(f"[EMAIL] KYC approuvé pour {rider_phone}")
+        return
+
+    resend.api_key = settings.RESEND_API_KEY
+
+    try:
+        resend.Emails.send({
+            "from": "Allô Tiak-Tiak <onboarding@resend.dev>",
+            "to": rider_phone + "@placeholder.com",  # sera remplacé par vrai email plus tard
+            "subject": "✅ Votre compte Allô Tiak-Tiak est activé !",
+            "html": f"""
+            <div style="font-family:system-ui;max-width:600px;margin:0 auto;padding:24px">
+                <h2 style="color:#00C853">✅ Compte activé — Allô Tiak-Tiak</h2>
+                <p>Bonjour {rider_name or 'Livreur'},</p>
+                <p>Votre dossier a été vérifié et approuvé. Vous pouvez maintenant accéder à la plateforme et commencer à recevoir des commandes.</p>
+                <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:20px 0">
+                    <p style="margin:0;color:#333">🏍️ Connectez-vous à l'application Allô Tiak-Tiak</p>
+                    <p style="margin:8px 0 0;color:#777;font-size:13px">Numéro : {rider_phone}</p>
+                </div>
+                <p style="color:#777;font-size:12px">Allô Tiak-Tiak — Dakar, Sénégal</p>
+            </div>
+            """
+        })
+        print(f"[EMAIL] Notification approbation envoyée pour {rider_phone}")
+    except Exception as e:
+        print(f"[EMAIL] Erreur approbation : {e}")

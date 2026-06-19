@@ -1,4 +1,4 @@
-from sqlalchemy import String, Boolean, ForeignKey, DateTime, func, Text
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, func, Text, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -32,6 +32,10 @@ class RiderProfile(Base):
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
 # JSON ex: {"Plateau→Almadies": 2000, "Plateau→Pikine": 1500}
     # delivery / transport / delivery,transport
+
+    current_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    current_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_updated_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

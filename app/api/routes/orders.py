@@ -472,3 +472,41 @@ def renew_order(
     order.broadcast_expires_at = int(time()) + 30 * 60
     db.commit()
     return {"message": "Commande renouvelee", "order_id": order_id}
+
+@router.get("/{order_id}/rider-location")
+def get_rider_location(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "client":
+        raise HTTPException(status_code=403, detail="Reserve aux clients")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+
+    if order.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Ce n'est pas votre commande")
+
+    if order.status not in ["accepted", "in_progress"]:
+        raise HTTPException(status_code=400, detail="Le suivi n'est disponible que pendant une livraison active")
+
+    if not order.rider_id:
+        raise HTTPException(status_code=400, detail="Aucun livreur assigne")
+
+    rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
+    if not rider_profile or rider_profile.current_lat is None or rider_profile.current_lng is None:
+        raise HTTPException(status_code=404, detail="Position du livreur indisponible")
+
+    is_stale = False
+    if rider_profile.location_updated_at:
+        age_seconds = (datetime.now(timezone.utc) - rider_profile.location_updated_at).total_seconds()
+        is_stale = age_seconds > 60
+
+    return {
+        "lat": rider_profile.current_lat,
+        "lng": rider_profile.current_lng,
+        "updated_at": rider_profile.location_updated_at,
+        "is_stale": is_stale,
+    }
