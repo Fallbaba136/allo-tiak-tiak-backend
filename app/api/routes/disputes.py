@@ -85,7 +85,7 @@ async def create_dispute(
     dispute = Dispute(
         complainant_id=current_user.id,
         accused_id=accused_id,
-        order_id=payload.order_id,
+        order_id=order_id,
         reason=reason,
         description=description,
         order_snapshot=order_snapshot,
