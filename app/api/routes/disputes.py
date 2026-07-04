@@ -93,6 +93,15 @@ async def create_dispute(
         status="open",
         expires_at=now + timedelta(days=DISPUTE_RETENTION_DAYS),
     )
+    if photo and photo.filename:
+        try:
+            from app.services.cloudinary_service import upload_kyc_document
+            contents = await photo.read()
+            url = upload_kyc_document(contents, "dispute_photos", f"dispute_{order_id}_{current_user.id}")
+            dispute.photo_url = url
+            print(f"[PHOTO] Photo litige uploadee : {url}")
+        except Exception as e:
+            print(f"[PHOTO] Erreur upload : {e}")
 
     db.add(dispute)
     db.commit()
