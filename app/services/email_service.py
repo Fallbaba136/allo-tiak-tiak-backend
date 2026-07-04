@@ -133,3 +133,56 @@ def send_dispute_notification(
             print(f"[EMAIL] Litige notifié à l'admin pour commande #{order_id}")
         except Exception as e:
             print(f"[EMAIL] Erreur notification admin : {e}")
+
+
+def send_dispute_resolution_notification(
+    order_id: int,
+    status: str,
+    resolution_note: str,
+    client_phone: str,
+    accused_phone: str,
+):
+    if not settings.RESEND_API_KEY or not settings.ADMIN_EMAIL:
+        print(f"[EMAIL] Resolution litige #{order_id} — config manquante")
+        return
+    resend.api_key = settings.RESEND_API_KEY
+
+    if status == "resolved":
+        verdict = "✅ En faveur du client"
+        color = "#00C853"
+        client_msg = "Votre litige a ete resolu en votre faveur. La commande a ete annulee."
+        rider_msg = "Le litige ouvert sur la commande #{} a ete resolu en faveur du client. La commission ne sera pas prelevee.".format(order_id)
+    elif status == "rejected":
+        verdict = "❌ Litige rejete"
+        color = "#FF4444"
+        client_msg = "Votre litige a ete examine et rejete. La commande est confirmee."
+        rider_msg = "Le litige ouvert sur la commande #{} a ete rejete. La commande est confirmee normalement.".format(order_id)
+    else:
+        verdict = "🔍 Litige clos"
+        color = "#FF9800"
+        client_msg = "Votre litige a ete clos."
+        rider_msg = "Le litige sur la commande #{} a ete clos.".format(order_id)
+
+    def make_html(message):
+        return f"""
+        <div style="font-family:system-ui;max-width:600px;margin:0 auto;padding:24px">
+            <h2 style="color:{color}">⚖️ Decision sur le litige — Commande #{order_id}</h2>
+            <p>{message}</p>
+            <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:20px 0">
+                <p style="margin:0;font-weight:600">Verdict : {verdict}</p>
+                <p style="margin:8px 0 0;color:#555">{resolution_note or 'Aucune note supplementaire.'}</p>
+            </div>
+            <p style="color:#777;font-size:12px">Allô Tiak-Tiak — Dakar, Sénégal</p>
+        </div>
+        """
+
+    # Email à l'admin
+    try:
+        resend.Emails.send({
+            "from": "Allô Tiak-Tiak <onboarding@resend.dev>",
+            "to": settings.ADMIN_EMAIL,
+            "subject": f"⚖️ Litige #{order_id} résolu — {verdict}",
+            "html": make_html(f"Résolution de la commande #{order_id}."),
+        })
+    except Exception as e:
+        print(f"[EMAIL] Erreur email admin resolution : {e}")
