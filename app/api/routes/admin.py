@@ -102,8 +102,33 @@ def admin_get_disputes(
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin),
 ):
+    from app.models.client_profile import ClientProfile
+    from app.models.rider_profile import RiderProfile
     disputes = db.query(Dispute).order_by(Dispute.created_at.desc()).all()
-    return disputes
+    result = []
+    for d in disputes:
+        complainant = db.query(User).filter(User.id == d.complainant_id).first()
+        accused = db.query(User).filter(User.id == d.accused_id).first()
+        client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == d.complainant_id).first()
+        rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == d.accused_id).first()
+        result.append({
+            "id": d.id,
+            "order_id": d.order_id,
+            "status": d.status,
+            "reason": d.reason,
+            "description": d.description,
+            "resolution_note": d.resolution_note,
+            "expires_at": d.expires_at.isoformat() if d.expires_at else None,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "complainant_id": d.complainant_id,
+            "accused_id": d.accused_id,
+            "client_phone": complainant.phone if complainant else None,
+            "client_name": client_profile.full_name if client_profile else None,
+            "client_address": client_profile.address if client_profile else None,
+            "rider_name": rider_profile.full_name if rider_profile else None,
+            "rider_phone": accused.phone if accused else None,
+        })
+    return result
 
 @router.patch("/disputes/{dispute_id}/resolve")
 def admin_resolve_dispute(
