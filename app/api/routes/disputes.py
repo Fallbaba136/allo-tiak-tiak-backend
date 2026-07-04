@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 
@@ -31,21 +32,25 @@ def dispute_to_out(d: Dispute) -> DisputeOut:
 
 # Client ou livreur ouvre un litige
 @router.post("/", response_model=DisputeOut)
-def create_dispute(
-    payload: DisputeCreate,
+async def create_dispute(
+    order_id: int = Form(...),
+    accused_id: int = Form(...),
+    reason: str = Form(...),
+    description: str = Form(...),
+    photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    order = db.query(Order).filter(Order.id == payload.order_id).first()
+    order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Commande introuvable")
 
     # Garde-fou 1 — commande disputable
-    if order.status not in DISPUTABLE_STATUSES:
+    if not order or order.status not in DISPUTABLE_STATUSES:
         raise HTTPException(status_code=400, detail="Cette commande ne peut pas faire l'objet d'un litige")
 
     # Garde-fou 2 — impliqué dans la commande
-    if current_user.id != order.client_id and current_user.id != order.rider_id:
+    if order and current_user.id != order.client_id and current_user.id != order.rider_id:
         raise HTTPException(status_code=403, detail="Vous n'êtes pas impliqué dans cette commande")
 
     # Garde-fou 3 — délai de 48h
@@ -55,7 +60,7 @@ def create_dispute(
 
     # Garde-fou 4 — un seul litige actif par commande
     existing = db.query(Dispute).filter(
-        Dispute.order_id == payload.order_id,
+        Dispute.order_id == order_id,
         Dispute.status.in_(["open", "under_review"])
     ).first()
     if existing:
@@ -81,9 +86,10 @@ def create_dispute(
         complainant_id=current_user.id,
         accused_id=accused_id,
         order_id=payload.order_id,
-        reason=payload.reason,
-        description=payload.description,
+        reason=reason,
+        description=description,
         order_snapshot=order_snapshot,
+        photo_url=None,
         status="open",
         expires_at=now + timedelta(days=DISPUTE_RETENTION_DAYS),
     )
@@ -104,8 +110,8 @@ def create_dispute(
             client_phone=client.phone if client else "inconnu",
             rider_phone=rider.phone if rider else "inconnu",
             rider_name=rider_profile.full_name if rider_profile else None,
-            reason=payload.reason,
-            description=payload.description,
+            reason=reason,
+            description=description,
         )
     except Exception as e:
         print(f"[EMAIL] Erreur notification litige : {e}")

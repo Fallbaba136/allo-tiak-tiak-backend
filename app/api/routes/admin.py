@@ -127,6 +127,7 @@ def admin_get_disputes(
             "client_address": client_profile.address if client_profile else None,
             "rider_name": rider_profile.full_name if rider_profile else None,
             "rider_phone": accused.phone if accused else None,
+            "photo_url": d.photo_url,
         })
     return result
 

@@ -15,6 +15,7 @@ class Dispute(Base):
     # Détails du litige
     reason: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text)
+    photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Snapshot de la commande au moment du litige
     order_snapshot: Mapped[dict] = mapped_column(JSON, nullable=True)
