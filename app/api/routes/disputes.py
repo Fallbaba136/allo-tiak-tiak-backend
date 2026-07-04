@@ -91,6 +91,25 @@ def create_dispute(
     db.add(dispute)
     db.commit()
     db.refresh(dispute)
+
+    # Notification email admin
+    try:
+        from app.services.email_service import send_dispute_notification
+        from app.models.rider_profile import RiderProfile
+        rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
+        client = db.query(User).filter(User.id == order.client_id).first()
+        rider = db.query(User).filter(User.id == order.rider_id).first()
+        send_dispute_notification(
+            order_id=order.id,
+            client_phone=client.phone if client else "inconnu",
+            rider_phone=rider.phone if rider else "inconnu",
+            rider_name=rider_profile.full_name if rider_profile else None,
+            reason=payload.reason,
+            description=payload.description,
+        )
+    except Exception as e:
+        print(f"[EMAIL] Erreur notification litige : {e}")
+
     return dispute_to_out(dispute)
 
 # Voir ses litiges
