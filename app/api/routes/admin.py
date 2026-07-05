@@ -544,3 +544,24 @@ def clean_test_orders(
         count += 1
     db.commit()
     return {"deleted": count, "message": f"{count} commande(s) supprimée(s)"}
+
+@router.patch("/orders/{order_id}/assign-rider")
+def admin_assign_rider(
+    order_id: int,
+    rider_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    from app.models.rider_profile import RiderProfile
+    rider = db.query(RiderProfile).filter(RiderProfile.user_id == rider_id).first()
+    if not rider:
+        raise HTTPException(status_code=404, detail="Livreur introuvable")
+    order.rider_id = rider_id
+    order.status = "accepted"
+    from datetime import datetime, timezone
+    order.accepted_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": f"Livreur #{rider_id} assigne a la commande #{order_id}"}
