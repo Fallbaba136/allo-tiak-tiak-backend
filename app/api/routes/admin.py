@@ -600,3 +600,86 @@ def admin_finance_stats(
         'month': get_stats(start_of_month),
         'all_time': get_stats(datetime(2020, 1, 1, tzinfo=timezone.utc)),
     }
+
+@router.get("/users/{user_id}/details")
+def admin_get_user_details(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.client_profile import ClientProfile
+    from app.models.rider_profile import RiderProfile
+    from app.models.review import Review
+    from sqlalchemy import func
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == user_id).first()
+    rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == user_id).first()
+
+    # Commandes
+    if user.role == 'client':
+        orders = db.query(Order).filter(Order.client_id == user_id).order_by(Order.created_at.desc()).limit(20).all()
+    else:
+        orders = db.query(Order).filter(Order.rider_id == user_id).order_by(Order.created_at.desc()).limit(20).all()
+
+    # Stats
+    confirmed = [o for o in orders if o.status == 'confirmed']
+    cancelled = [o for o in orders if o.status == 'cancelled']
+
+    # Notes
+    rating_data = db.query(
+        func.avg(Review.rating).label('avg'),
+        func.count(Review.id).label('total'),
+    ).filter(Review.rider_id == user_id).first()
+
+    return {
+        'user_id': user_id,
+        'phone': user.phone,
+        'role': user.role,
+        'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
+        'client_name': client_profile.full_name if client_profile else None,
+        'client_address': client_profile.address if client_profile else None,
+        'rider_name': rider_profile.full_name if rider_profile else None,
+        'rider_zone': rider_profile.zone if rider_profile else None,
+        'rider_is_verified': rider_profile.is_verified if rider_profile else None,
+        'rider_is_blocked': rider_profile.is_blocked if rider_profile else None,
+        'total_orders': len(orders),
+        'confirmed_orders': len(confirmed),
+        'cancelled_orders': len(cancelled),
+        'total_spent': sum(o.amount or 0 for o in confirmed) if user.role == 'client' else 0,
+        'total_earned': sum((o.amount or 0) * 0.95 for o in confirmed) if user.role == 'rider' else 0,
+        'average_rating': round(float(rating_data.avg), 1) if rating_data.avg else None,
+        'total_reviews': rating_data.total or 0,
+        'recent_orders': [
+            {
+                'id': o.id,
+                'status': o.status,
+                'amount': o.amount,
+                'order_type': o.order_type,
+                'created_at': o.created_at.isoformat() if o.created_at else None,
+            }
+            for o in orders[:10]
+        ],
+    }
+
+@router.delete("/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.client_profile import ClientProfile
+    from app.models.rider_profile import RiderProfile
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    db.query(ClientProfile).filter(ClientProfile.user_id == user_id).delete()
+    db.query(RiderProfile).filter(RiderProfile.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+    return {"message": f"Utilisateur #{user_id} supprime"}
