@@ -565,3 +565,38 @@ def admin_assign_rider(
     order.accepted_at = datetime.now(timezone.utc)
     db.commit()
     return {"message": f"Livreur #{rider_id} assigne a la commande #{order_id}"}
+
+@router.get("/stats/finance")
+def admin_finance_stats(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from sqlalchemy import func
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def get_stats(start):
+        result = db.query(
+            func.count(Order.id).label('count'),
+            func.sum(Order.amount).label('total_amount'),
+            func.sum(Order.commission).label('total_commission'),
+        ).filter(
+            Order.status == 'confirmed',
+            Order.confirmed_at >= start,
+        ).first()
+        return {
+            'count': result.count or 0,
+            'total_amount': float(result.total_amount or 0),
+            'total_commission': float(result.total_commission or 0),
+        }
+
+    return {
+        'today': get_stats(start_of_today),
+        'week': get_stats(start_of_week),
+        'month': get_stats(start_of_month),
+        'all_time': get_stats(datetime(2020, 1, 1, tzinfo=timezone.utc)),
+    }
