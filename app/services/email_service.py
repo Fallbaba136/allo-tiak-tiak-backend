@@ -186,3 +186,39 @@ def send_dispute_resolution_notification(
         })
     except Exception as e:
         print(f"[EMAIL] Erreur email admin resolution : {e}")
+
+
+def send_support_message(user_phone: str, subject: str, message: str):
+    if not settings.RESEND_API_KEY or not settings.ADMIN_EMAIL:
+        print(f"[EMAIL] Support — config manquante")
+        return
+    resend.api_key = settings.RESEND_API_KEY
+    try:
+        resend.Emails.send({
+            "from": "Allo Tiak-Tiak <onboarding@resend.dev>",
+            "to": settings.ADMIN_EMAIL,
+            "subject": f"[Support] {subject}",
+            "html": f"""
+            <div style="font-family:system-ui;max-width:600px;margin:0 auto;padding:24px">
+                <h2 style="color:#00C853">📩 Nouveau message support</h2>
+                <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                    <tr style="background:#f5f5f5">
+                        <td style="padding:10px;font-weight:600">Utilisateur</td>
+                        <td style="padding:10px">{user_phone}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;font-weight:600">Sujet</td>
+                        <td style="padding:10px">{subject}</td>
+                    </tr>
+                    <tr style="background:#f5f5f5">
+                        <td style="padding:10px;font-weight:600">Message</td>
+                        <td style="padding:10px">{message}</td>
+                    </tr>
+                </table>
+                <p style="color:#777;font-size:12px">Allo Tiak-Tiak — Dakar, Senegal</p>
+            </div>
+            """
+        })
+        print(f"[EMAIL] Message support envoye depuis {user_phone}")
+    except Exception as e:
+        print(f"[EMAIL] Erreur support : {e}")

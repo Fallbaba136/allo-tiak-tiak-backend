@@ -168,3 +168,20 @@ def resolve_dispute(
     db.commit()
     db.refresh(dispute)
     return dispute_to_out(dispute)
+@router.post("/contact-support")
+async def contact_support(
+    subject: str = Form(...),
+    message: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        from app.services.email_service import send_support_message
+        send_support_message(
+            user_phone=current_user.phone,
+            subject=subject,
+            message=message,
+        )
+        return {"message": "Message envoye avec succes"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
