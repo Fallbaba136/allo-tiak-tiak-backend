@@ -683,3 +683,55 @@ def admin_delete_user(
     db.delete(user)
     db.commit()
     return {"message": f"Utilisateur #{user_id} supprime"}
+
+@router.delete("/cleanup/expired-orders")
+def cleanup_expired_orders(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from datetime import datetime, timezone, timedelta
+    from app.models.price_proposal import PriceProposal
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    expired = db.query(Order).filter(
+        Order.status == "pending",
+        Order.created_at < cutoff,
+    ).all()
+
+    count = 0
+    for o in expired:
+        db.query(PriceProposal).filter(PriceProposal.order_id == o.id).delete()
+        db.delete(o)
+        count += 1
+
+    db.commit()
+    print(f"[CLEANUP] {count} commandes expirees supprimees")
+    return {"deleted": count, "message": f"{count} commandes supprimees"}
+
+@router.get("/cron/cleanup")
+def cron_cleanup(
+    secret: str,
+    db: Session = Depends(get_db),
+):
+    from app.core.config import settings
+    if secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+
+    from datetime import datetime, timezone, timedelta
+    from app.models.price_proposal import PriceProposal
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    expired = db.query(Order).filter(
+        Order.status == "pending",
+        Order.created_at < cutoff,
+    ).all()
+
+    count = 0
+    for o in expired:
+        db.query(PriceProposal).filter(PriceProposal.order_id == o.id).delete()
+        db.delete(o)
+        count += 1
+
+    db.commit()
+    print(f"[CRON] {count} commandes expirees supprimees")
+    return {"deleted": count}
