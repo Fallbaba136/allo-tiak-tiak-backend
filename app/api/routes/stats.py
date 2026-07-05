@@ -112,3 +112,22 @@ def get_activity_by_hour(
 
     data = {int(r.hour): int(r.count) for r in results}
     return [{"hour": h, "count": data.get(h, 0)} for h in range(6, 22)]
+
+@router.get("/my-activity-by-hour")
+def get_my_activity_by_hour(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import extract, func
+    from app.models.order import Order
+
+    results = db.query(
+        extract('hour', Order.created_at).label('hour'),
+        func.count(Order.id).label('count'),
+    ).filter(
+        Order.rider_id == current_user.id,
+        Order.status == 'confirmed',
+    ).group_by('hour').all()
+
+    data = {int(r.hour): int(r.count) for r in results}
+    return [{"hour": h, "count": data.get(h, 0)} for h in range(6, 22)]
