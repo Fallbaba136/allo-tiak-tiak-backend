@@ -125,6 +125,16 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
+    # Commande directe — passe en accepted automatiquement
+    if payload.rider_id is not None:
+        from datetime import datetime, timezone
+        import random
+        order.status = "accepted"
+        order.accepted_at = datetime.now(timezone.utc)
+        order.delivery_code = str(random.randint(100000, 999999))
+        db.commit()
+        db.refresh(order)
+
 
     if payload.rider_id is None:
         query = db.query(RiderProfile).filter(
