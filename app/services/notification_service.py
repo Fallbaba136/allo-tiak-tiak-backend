@@ -40,3 +40,23 @@ def send_order_notification(fcm_token: str, order_id: int, pickup: str, dropoff:
             return messaging.send(message)
         except Exception as e:
             print(f"[NOTIF] Erreur FCM : {e}")
+
+
+def send_notification(fcm_token: str, title: str, body: str, data: dict = None):
+    if not fcm_token:
+        return
+    try:
+        import httpx
+        payload = {
+            "to": fcm_token,
+            "title": title,
+            "body": body,
+            "data": data or {},
+            "sound": "default",
+            "priority": "high",
+        }
+        with httpx.Client() as client:
+            res = client.post("https://exp.host/--/api/v2/push/send", json=payload, timeout=10)
+            print(f"[NOTIF] {title} — {res.status_code}")
+    except Exception as e:
+        print(f"[NOTIF] Erreur : {e}")

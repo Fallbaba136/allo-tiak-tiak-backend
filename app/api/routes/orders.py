@@ -229,8 +229,23 @@ def update_order_status(
         if payload.status == "cancelled":
             order.cancelled_at = now
             order.cancelled_by_rider_id = order.rider_id
+            cancelled_client_id = order.client_id
             order.rider_id = None
             order.cancellation_reason = payload.cancellation_reason
+            # Notifier le client
+            try:
+                from app.models.client_profile import ClientProfile
+                from app.services.notification_service import send_notification
+                client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == cancelled_client_id).first()
+                if client_profile and client_profile.fcm_token:
+                    send_notification(
+                        fcm_token=client_profile.fcm_token,
+                        title="❌ Course annulée",
+                        body="Le livreur a annulé votre commande. Elle est remise en recherche.",
+                        data={"order_id": str(order.id), "type": "order_cancelled_by_rider"}
+                    )
+            except Exception as e:
+                print(f"[NOTIF] Erreur notif client annulation : {e}")
     if payload.status == "accepted":
         rider_profile_check = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
         if rider_profile_check and not rider_profile_check.is_available:
@@ -555,6 +570,20 @@ def accept_direct_order(
     order.delivery_code = str(random.randint(100000, 999999))
     db.commit()
     db.refresh(order)
+    # Notifier le client
+    try:
+        from app.models.client_profile import ClientProfile
+        from app.services.notification_service import send_notification
+        client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+        if client_profile and client_profile.fcm_token:
+            send_notification(
+                fcm_token=client_profile.fcm_token,
+                title="✅ Livreur en route !",
+                body="Votre livreur a accepté votre commande directe.",
+                data={"order_id": str(order_id), "type": "order_accepted"}
+            )
+    except Exception as e:
+        print(f"[NOTIF] Erreur notif client accept-direct : {e}")
     return order_to_out(order, db)
 
 @router.post("/{order_id}/refuse-direct")
@@ -576,4 +605,18 @@ def refuse_direct_order(
     order.rider_id = None
     db.commit()
     db.refresh(order)
+    # Notifier le client discrètement
+    try:
+        from app.models.client_profile import ClientProfile
+        from app.services.notification_service import send_notification
+        client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+        if client_profile and client_profile.fcm_token:
+            send_notification(
+                fcm_token=client_profile.fcm_token,
+                title="🔍 Recherche de livreur",
+                body="Votre commande est maintenant ouverte a tous les livreurs disponibles.",
+                data={"order_id": str(order_id), "type": "order_searching"}
+            )
+    except Exception as e:
+        print(f"[NOTIF] Erreur notif client refuse-direct : {e}")
     return {"message": "Commande refusee"}
