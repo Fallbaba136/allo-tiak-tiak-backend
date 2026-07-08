@@ -134,6 +134,18 @@ def create_order(
         order.delivery_code = str(random.randint(100000, 999999))
         db.commit()
         db.refresh(order)
+        # Notification push au livreur
+        try:
+            rider_profile_direct = db.query(RiderProfile).filter(RiderProfile.user_id == payload.rider_id).first()
+            if rider_profile_direct and rider_profile_direct.fcm_token:
+                send_order_notification(
+                    fcm_token=rider_profile_direct.fcm_token,
+                    order_id=order.id,
+                    pickup=order.pickup_address,
+                    dropoff=order.delivery_address,
+                )
+        except Exception as e:
+            print(f"[NOTIF] Erreur notification commande directe : {e}")
 
 
     if payload.rider_id is None:
