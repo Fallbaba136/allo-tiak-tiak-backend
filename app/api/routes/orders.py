@@ -539,3 +539,48 @@ def get_rider_location(
         "updated_at": rider_profile.location_updated_at,
         "is_stale": is_stale,
     }
+
+@router.post("/{order_id}/accept-direct")
+def accept_direct_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Reserve aux livreurs")
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    if order.rider_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cette commande ne vous est pas destinee")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Commande non disponible")
+    from datetime import datetime, timezone
+    import random
+    order.status = "accepted"
+    order.accepted_at = datetime.now(timezone.utc)
+    order.delivery_code = str(random.randint(100000, 999999))
+    db.commit()
+    db.refresh(order)
+    return order_to_out(order, db)
+
+@router.post("/{order_id}/refuse-direct")
+def refuse_direct_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "rider":
+        raise HTTPException(status_code=403, detail="Reserve aux livreurs")
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    if order.rider_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cette commande ne vous est pas destinee")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Commande non disponible")
+    # Remet la commande en mode automatique sans informer le client
+    order.rider_id = None
+    db.commit()
+    db.refresh(order)
+    return {"message": "Commande refusee"}
