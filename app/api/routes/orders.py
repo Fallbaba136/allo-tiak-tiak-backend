@@ -125,16 +125,9 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
-    # Commande directe — passe en accepted automatiquement
+    # Commande directe — reste en pending, livreur doit accepter
     if payload.rider_id is not None:
-        from datetime import datetime, timezone
-        import random
-        order.status = "accepted"
-        order.accepted_at = datetime.now(timezone.utc)
-        order.delivery_code = str(random.randint(100000, 999999))
-        db.commit()
-        db.refresh(order)
-        # Notification push au livreur
+        # Notification push au livreur pour qu'il accepte ou refuse
         try:
             rider_profile_direct = db.query(RiderProfile).filter(RiderProfile.user_id == payload.rider_id).first()
             if rider_profile_direct and rider_profile_direct.fcm_token:
