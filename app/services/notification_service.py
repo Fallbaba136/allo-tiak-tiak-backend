@@ -9,13 +9,16 @@ def send_order_notification(fcm_token: str, order_id: int, pickup: str, dropoff:
     # Supporte les deux formats : Expo token et FCM token
     if fcm_token.startswith("ExponentPushToken"):
         try:
+            pickup_short = pickup[:25] + '...' if len(pickup) > 25 else pickup
+            dropoff_short = dropoff[:25] + '...' if len(dropoff) > 25 else dropoff
             payload = {
                 "to": fcm_token,
-                "title": "Nouvelle commande 🏍️",
-                "body": f"De {pickup[:30]} → {dropoff[:30]}",
+                "title": "🏍️ Nouvelle commande disponible",
+                "body": f"📍 {pickup_short}\n🏁 {dropoff_short}",
                 "data": {"order_id": str(order_id), "type": "new_order"},
                 "sound": "default",
                 "priority": "high",
+                "badge": 1,
             }
             with httpx.Client() as client:
                 res = client.post(EXPO_PUSH_URL, json=payload, timeout=10)
