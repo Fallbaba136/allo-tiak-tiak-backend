@@ -570,17 +570,19 @@ def accept_direct_order(
     order.delivery_code = str(random.randint(100000, 999999))
     db.commit()
     db.refresh(order)
-    # Notifier le client
+    # Notifier le client avec ETA
     try:
         from app.models.client_profile import ClientProfile
-        from app.services.notification_service import send_notification
+        from app.services.notification_service import send_rider_accepted_notification
         client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+        rider_profile_for_notif = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
         if client_profile and client_profile.fcm_token:
-            send_notification(
-                fcm_token=client_profile.fcm_token,
-                title="✅ Livreur en route !",
-                body="Votre livreur a accepté votre commande directe.",
-                data={"order_id": str(order_id), "type": "order_accepted"}
+            send_rider_accepted_notification(
+                client_fcm_token=client_profile.fcm_token,
+                order_id=order_id,
+                rider_name=rider_profile_for_notif.full_name if rider_profile_for_notif else None,
+                rider_lat=rider_profile_for_notif.current_lat if rider_profile_for_notif else None,
+                rider_lng=rider_profile_for_notif.current_lng if rider_profile_for_notif else None,
             )
     except Exception as e:
         print(f"[NOTIF] Erreur notif client accept-direct : {e}")

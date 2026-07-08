@@ -60,3 +60,37 @@ def send_notification(fcm_token: str, title: str, body: str, data: dict = None):
             print(f"[NOTIF] {title} — {res.status_code}")
     except Exception as e:
         print(f"[NOTIF] Erreur : {e}")
+
+
+def estimate_eta(rider_lat, rider_lng, pickup_lat=None, pickup_lng=None):
+    """Estimation simple du temps d'arrivée en minutes"""
+    if not rider_lat or not rider_lng:
+        return None
+    if not pickup_lat or not pickup_lng:
+        # Estimation par défaut pour Dakar
+        return 10
+    # Distance à vol d'oiseau en km
+    import math
+    R = 6371
+    dlat = math.radians(pickup_lat - rider_lat)
+    dlng = math.radians(pickup_lng - rider_lng)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(rider_lat)) * math.cos(math.radians(pickup_lat)) * math.sin(dlng/2)**2
+    distance = R * 2 * math.asin(math.sqrt(a))
+    # Vitesse moyenne moto en ville : 25 km/h
+    eta_minutes = int((distance / 25) * 60)
+    return max(3, min(eta_minutes, 45))  # Entre 3 et 45 minutes
+
+def send_rider_accepted_notification(client_fcm_token: str, order_id: int, rider_name: str, rider_lat=None, rider_lng=None):
+    if not client_fcm_token:
+        return
+    eta = estimate_eta(rider_lat, rider_lng)
+    if eta:
+        body = f"{rider_name or 'Votre livreur'} est en route — arrive dans ~{eta} min"
+    else:
+        body = f"{rider_name or 'Votre livreur'} a accepté votre commande et arrive bientôt"
+    send_notification(
+        fcm_token=client_fcm_token,
+        title="🏍️ Livreur en route !",
+        body=body,
+        data={"order_id": str(order_id), "type": "order_accepted", "eta": str(eta or 0)}
+    )

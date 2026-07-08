@@ -202,17 +202,20 @@ def accept_proposal(
         except Exception as e:
             print(f"[FCM] Erreur notification livreur: {e}")
 
-    # Notifier le client que le livreur a été accepté
+    # Notifier le client avec ETA
     try:
         from app.models.client_profile import ClientProfile
-        from app.services.notification_service import send_notification
+        from app.models.rider_profile import RiderProfile
+        from app.services.notification_service import send_rider_accepted_notification
         client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+        rider_profile_notif = db.query(RiderProfile).filter(RiderProfile.user_id == proposal.rider_id).first()
         if client_profile and client_profile.fcm_token:
-            send_notification(
-                fcm_token=client_profile.fcm_token,
-                title="🏍️ Livreur en route !",
-                body="Votre livreur a accepté la commande et est en route.",
-                data={"order_id": str(order_id), "type": "order_accepted"}
+            send_rider_accepted_notification(
+                client_fcm_token=client_profile.fcm_token,
+                order_id=order_id,
+                rider_name=rider_profile_notif.full_name if rider_profile_notif else None,
+                rider_lat=rider_profile_notif.current_lat if rider_profile_notif else None,
+                rider_lng=rider_profile_notif.current_lng if rider_profile_notif else None,
             )
     except Exception as e:
         print(f"[NOTIF] Erreur notif client : {e}")
