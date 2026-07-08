@@ -307,7 +307,7 @@ def verify_delivery_code(
     if not order.delivery_code:
         raise HTTPException(status_code=400, detail="Aucun code de livraison genere")
 
-    if order.delivery_code_expires_at < int(time()):
+    if order.delivery_code_expires_at and order.delivery_code_expires_at < int(time()):
         raise HTTPException(status_code=400, detail="Code expire")
 
     if payload.code != order.delivery_code:
