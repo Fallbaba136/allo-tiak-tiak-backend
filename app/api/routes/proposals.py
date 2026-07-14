@@ -163,7 +163,8 @@ def accept_proposal(
                 )
             except Exception as sms_err:
                 print(f"[SMS] Erreur envoi code : {sms_err}")
-    proposal.status = "accepted"
+    try:
+      proposal.status = "accepted"
 
     # Rejeter les autres propositions
     db.query(PriceProposal).filter(
@@ -208,7 +209,6 @@ def accept_proposal(
     # Notifier le client avec ETA
     try:
         from app.models.client_profile import ClientProfile
-        from app.models.rider_profile import RiderProfile
         from app.services.notification_service import send_rider_accepted_notification
         client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
         rider_profile_notif = db.query(RiderProfile).filter(RiderProfile.user_id == proposal.rider_id).first()
@@ -223,6 +223,7 @@ def accept_proposal(
     except Exception as e:
         print(f"[NOTIF] Erreur notif client : {e}")
     print(f"[ACCEPT] Proposition {proposal_id} acceptee pour commande {order_id}")
+    print(f"[ACCEPT] OK - order {order_id}, proposal {proposal_id}, rider {proposal.rider_id}")
     return {"message": "Proposition acceptee", "order_id": order_id, "amount": proposal.proposed_price}
 
 
