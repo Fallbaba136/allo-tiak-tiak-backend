@@ -154,12 +154,15 @@ def accept_proposal(
             code = f"{secrets.randbelow(10**6):06d}"
             order.delivery_code = code
             order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
-            from app.services.sms_service import send_delivery_code_sms
-            send_delivery_code_sms(
-                receiver_phone=order.receiver_phone,
-                code=code,
-                order_id=order.id,
-            )
+            try:
+                from app.services.sms_service import send_delivery_code_sms
+                send_delivery_code_sms(
+                    receiver_phone=order.receiver_phone,
+                    code=code,
+                    order_id=order.id,
+                )
+            except Exception as sms_err:
+                print(f"[SMS] Erreur envoi code : {sms_err}")
     proposal.status = "accepted"
 
     # Rejeter les autres propositions
