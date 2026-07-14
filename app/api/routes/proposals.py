@@ -163,8 +163,6 @@ def accept_proposal(
                 )
             except Exception as sms_err:
                 print(f"[SMS] Erreur envoi code : {sms_err}")
-    try:
-      proposal.status = "accepted"
 
     # Rejeter les autres propositions
     db.query(PriceProposal).filter(
