@@ -58,4 +58,4 @@ class DeliveryCodeVerify(BaseModel):
     code: str
 
 class PaymentConfirm(BaseModel):
-    payment_method: Literal["wave", "orange_money"]
+    payment_method: Literal["wave", "orange_money", "cash"]
