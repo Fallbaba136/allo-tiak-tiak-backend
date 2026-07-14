@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -47,9 +48,12 @@ def upsert_my_profile(
         address=profile.address,
     )
 
+class FCMTokenUpdate(BaseModel):
+    fcm_token: str
+
 @router.post("/me/fcm-token")
 def update_client_fcm_token(
-    token: str,
+    payload: FCMTokenUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -58,6 +62,6 @@ def update_client_fcm_token(
     profile = db.query(ClientProfile).filter(ClientProfile.user_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profil introuvable")
-    profile.fcm_token = token
+    profile.fcm_token = payload.fcm_token
     db.commit()
     return {"message": "FCM token mis a jour"}
