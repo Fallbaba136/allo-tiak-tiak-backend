@@ -238,10 +238,11 @@ def update_order_status(
                 from app.services.notification_service import send_notification
                 client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == cancelled_client_id).first()
                 if client_profile and client_profile.fcm_token:
+                    reason = payload.cancellation_reason or "Aucune raison fournie"
                     send_notification(
                         fcm_token=client_profile.fcm_token,
-                        title="❌ Course annulée",
-                        body="Le livreur a annulé votre commande. Elle est remise en recherche.",
+                        title="❌ Course annulée par le livreur",
+                        body=f"Motif : {reason}. Votre commande est remise en recherche.",
                         data={"order_id": str(order.id), "type": "order_cancelled_by_rider"}
                     )
             except Exception as e:
