@@ -222,6 +222,7 @@ def accept_proposal(
             )
     except Exception as e:
         print(f"[NOTIF] Erreur notif client : {e}")
+    print(f"[ACCEPT] Proposition {proposal_id} acceptee pour commande {order_id}")
     return {"message": "Proposition acceptee", "order_id": order_id, "amount": proposal.proposed_price}
 
 
