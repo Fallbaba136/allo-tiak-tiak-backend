@@ -20,6 +20,8 @@ class Dispute(Base):
     # Snapshot de la commande au moment du litige
     order_snapshot: Mapped[dict] = mapped_column(JSON, nullable=True)
 
+    # Type de litige
+    dispute_type: Mapped[str | None] = mapped_column(String(50), default="other", nullable=True)
     # Statut
     status: Mapped[str] = mapped_column(String(30), default="open")
     # open / under_review / resolved / rejected
@@ -27,8 +29,14 @@ class Dispute(Base):
     # Score de fiabilité
     rejected_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Réponses
+    client_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rider_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_response_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    rider_response_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     # Résolution
     resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_favor: Mapped[str | None] = mapped_column(String(20), nullable=True)
     resolved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Rétention — suppression après 1 an

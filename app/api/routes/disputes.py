@@ -208,3 +208,113 @@ async def contact_support(
         print(f"[NOTIF] Erreur notif client litige : {e}")
 
     return {"message": "Message envoye avec succes"}
+
+@router.post("/{dispute_id}/respond")
+def respond_to_dispute(
+    dispute_id: int,
+    response: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Litige introuvable")
+    
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    
+    if current_user.id == dispute.complainant_id or current_user.id == dispute.accused_id:
+        # Déterminer si c'est le client ou le livreur
+        from app.models.order import Order
+        order = db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order and current_user.id == order.client_id:
+            dispute.client_response = response
+            dispute.client_response_at = now
+            # Notifier le rider
+            try:
+                from app.models.rider_profile import RiderProfile
+                from app.services.notification_service import send_notification
+                rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
+                if rider_profile and rider_profile.fcm_token:
+                    send_notification(
+                        fcm_token=rider_profile.fcm_token,
+                        title="💬 Le client a répondu au litige",
+                        body=response[:80],
+                        data={"dispute_id": str(dispute_id), "type": "dispute_response"}
+                    )
+            except Exception as e:
+                print(f"[NOTIF] Erreur : {e}")
+        elif order and current_user.id == order.rider_id:
+            dispute.rider_response = response
+            dispute.rider_response_at = now
+            # Notifier le client
+            try:
+                from app.models.client_profile import ClientProfile
+                from app.services.notification_service import send_notification
+                client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+                if client_profile and client_profile.fcm_token:
+                    send_notification(
+                        fcm_token=client_profile.fcm_token,
+                        title="💬 Le livreur a répondu au litige",
+                        body=response[:80],
+                        data={"dispute_id": str(dispute_id), "type": "dispute_response"}
+                    )
+            except Exception as e:
+                print(f"[NOTIF] Erreur : {e}")
+    else:
+        raise HTTPException(status_code=403, detail="Non autorisé")
+    
+    dispute.status = "under_review"
+    db.commit()
+    return {"message": "Réponse envoyée"}
+
+@router.patch("/{dispute_id}/admin-resolve")
+def admin_resolve_dispute(
+    dispute_id: int,
+    resolution_note: str,
+    resolution_favor: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Reserve aux admins")
+    dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Litige introuvable")
+    
+    dispute.status = "resolved"
+    dispute.resolution_note = resolution_note
+    dispute.resolution_favor = resolution_favor
+    dispute.resolved_by_id = current_user.id
+    db.commit()
+
+    # Notifier les deux parties
+    try:
+        from app.models.order import Order
+        from app.models.client_profile import ClientProfile
+        from app.models.rider_profile import RiderProfile
+        from app.services.notification_service import send_notification
+        order = db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order:
+            favor_label = "votre faveur" if resolution_favor == "client" else "celle du livreur"
+            client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+            if client_profile and client_profile.fcm_token:
+                send_notification(
+                    fcm_token=client_profile.fcm_token,
+                    title="✅ Litige résolu",
+                    body=f"Le litige a été résolu en {favor_label}. {resolution_note}",
+                    data={"dispute_id": str(dispute_id), "type": "dispute_resolved"}
+                )
+            rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
+            if rider_profile and rider_profile.fcm_token:
+                favor_label_r = "votre faveur" if resolution_favor == "rider" else "celle du client"
+                send_notification(
+                    fcm_token=rider_profile.fcm_token,
+                    title="✅ Litige résolu",
+                    body=f"Le litige a été résolu en {favor_label_r}. {resolution_note}",
+                    data={"dispute_id": str(dispute_id), "type": "dispute_resolved"}
+                )
+    except Exception as e:
+        print(f"[NOTIF] Erreur : {e}")
+
+    return {"message": "Litige résolu"}
