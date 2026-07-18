@@ -227,11 +227,13 @@ def update_order_status(
         if payload.status not in ["accepted", "in_progress", "delivered", "cancelled"]:
             raise HTTPException(status_code=403, detail="Action non autorisee pour le livreur")
         if payload.status == "cancelled":
-            order.cancelled_at = now
             order.cancelled_by_rider_id = order.rider_id
             cancelled_client_id = order.client_id
             order.rider_id = None
             order.cancellation_reason = payload.cancellation_reason
+            # Remettre en pending pour que d'autres livreurs puissent l'accepter
+            order.status = "pending"
+            order.cancelled_at = now
             # Notifier le client
             try:
                 from app.models.client_profile import ClientProfile
