@@ -182,6 +182,29 @@ async def contact_support(
             subject=subject,
             message=message,
         )
-        return {"message": "Message envoye avec succes"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[EMAIL] Erreur : {e}")
+
+    # Notifier le client si c'est un problème de paiement
+    try:
+        import re
+        match = re.search(r'Commande #(\d+)', message)
+        if match and current_user.role == "rider":
+            order_id = int(match.group(1))
+            from app.models.order import Order
+            from app.models.client_profile import ClientProfile
+            from app.services.notification_service import send_notification
+            order = db.query(Order).filter(Order.id == order_id).first()
+            if order:
+                client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+                if client_profile and client_profile.fcm_token:
+                    send_notification(
+                        fcm_token=client_profile.fcm_token,
+                        title="⚠️ Problème de paiement signalé",
+                        body=f"Le livreur a signalé un problème sur votre commande #{order_id}. Notre équipe va vous contacter.",
+                        data={"order_id": str(order_id), "type": "payment_issue"}
+                    )
+    except Exception as e:
+        print(f"[NOTIF] Erreur notif client litige : {e}")
+
+    return {"message": "Message envoye avec succes"}
