@@ -764,3 +764,54 @@ def cron_cleanup(
     db.commit()
     print(f"[CRON] {count} commandes expirees supprimees")
     return {"deleted": count}
+
+@router.patch("/disputes/{dispute_id}/admin-resolve")
+def admin_resolve_dispute_full(
+    dispute_id: int,
+    resolution_note: str,
+    resolution_favor: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.dispute import Dispute
+    from app.models.order import Order
+    from app.models.client_profile import ClientProfile
+    from app.models.rider_profile import RiderProfile
+    from app.services.notification_service import send_notification
+
+    dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Litige introuvable")
+
+    dispute.status = "resolved"
+    dispute.resolution_note = resolution_note
+    dispute.resolution_favor = resolution_favor
+    db.commit()
+
+    # Notifier les deux parties
+    try:
+        order = db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order:
+            favor_client = resolution_favor == 'client'
+            # Notifier client
+            client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
+            if client_profile and client_profile.fcm_token:
+                send_notification(
+                    fcm_token=client_profile.fcm_token,
+                    title="⚖️ Litige résolu",
+                    body=f"{'✅ Decision en votre faveur' if favor_client else '❌ Decision en faveur du livreur'}. {resolution_note}",
+                    data={"dispute_id": str(dispute_id), "type": "dispute_resolved"}
+                )
+            # Notifier livreur
+            rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
+            if rider_profile and rider_profile.fcm_token:
+                send_notification(
+                    fcm_token=rider_profile.fcm_token,
+                    title="⚖️ Litige résolu",
+                    body=f"{'❌ Decision en faveur du client' if favor_client else '✅ Decision en votre faveur'}. {resolution_note}",
+                    data={"dispute_id": str(dispute_id), "type": "dispute_resolved"}
+                )
+    except Exception as e:
+        print(f"[NOTIF] Erreur : {e}")
+
+    return {"message": "Litige resolu"}
