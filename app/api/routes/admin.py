@@ -132,8 +132,33 @@ def admin_get_disputes(
             "rider_response": d.rider_response,
             "resolution_favor": d.resolution_favor,
             "dispute_type": d.dispute_type,
+            "client_response_at": d.client_response_at.isoformat() if d.client_response_at else None,
+            "rider_response_at": d.rider_response_at.isoformat() if d.rider_response_at else None,
+            "order_traces": get_order_traces(d.order_id, db),
         })
     return result
+
+def get_order_traces(order_id, db):
+    from app.models.order import Order
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        return None
+    return {
+        "id": order.id,
+        "amount": order.amount,
+        "status": order.status,
+        "payment_status": order.payment_status,
+        "payment_method": order.payment_method,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+        "accepted_at": order.accepted_at.isoformat() if order.accepted_at else None,
+        "picked_up_at": order.picked_up_at.isoformat() if order.picked_up_at else None,
+        "delivered_at": order.delivered_at.isoformat() if order.delivered_at else None,
+        "payment_confirmed_at": order.payment_confirmed_at.isoformat() if order.payment_confirmed_at else None,
+        "delivery_code_used": order.delivery_code is None and order.status in ['confirmed'],
+        "pickup_address": order.pickup_address,
+        "delivery_address": order.delivery_address,
+        "cancellation_reason": order.cancellation_reason,
+    }
 
 @router.patch("/disputes/{dispute_id}/resolve")
 def admin_resolve_dispute(
