@@ -128,6 +128,10 @@ def admin_get_disputes(
             "rider_name": rider_profile.full_name if rider_profile else None,
             "rider_phone": accused.phone if accused else None,
             "photo_url": d.photo_url,
+            "client_response": d.client_response,
+            "rider_response": d.rider_response,
+            "resolution_favor": d.resolution_favor,
+            "dispute_type": d.dispute_type,
         })
     return result
 
