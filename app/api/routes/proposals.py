@@ -195,14 +195,15 @@ def accept_proposal(
     rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == proposal.rider_id).first()
     if rider_profile and rider_profile.fcm_token:
         try:
-            send_order_notification(
+            from app.services.notification_service import send_notification
+            send_notification(
                 fcm_token=rider_profile.fcm_token,
-                order_id=order_id,
-                pickup=order.pickup_address,
-                dropoff=order.delivery_address,
+                title="✅ Offre acceptée !",
+                body=f"Le client a accepté votre offre de {int(proposal.proposed_price):,} FCFA. Rendez-vous au point de départ !",
+                data={"order_id": str(order_id), "type": "proposal_accepted"}
             )
         except Exception as e:
-            print(f"[FCM] Erreur notification livreur: {e}")
+            print(f"[NOTIF] Erreur notification livreur: {e}")
 
     # Notifier le client avec ETA
     try:
