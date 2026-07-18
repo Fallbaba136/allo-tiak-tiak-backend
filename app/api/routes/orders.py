@@ -337,6 +337,14 @@ def verify_delivery_code(
     now = datetime.now(timezone.utc)
     order.delivery_code = None
     confirm_order(order, db, now)
+    try:
+        from app.services.audit_service import log_action
+        log_action(db, current_user.id, "delivery_code_verified", "order", order_id, {
+            "verified_by": current_user.phone,
+            "order_status": "confirmed",
+        })
+    except Exception as e:
+        print(f"[AUDIT] Erreur : {e}")
     return order_to_out(order, db)
 
 @router.get("/{order_id}/payment-summary")

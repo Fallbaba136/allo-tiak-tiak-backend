@@ -815,3 +815,27 @@ def admin_resolve_dispute_full(
         print(f"[NOTIF] Erreur : {e}")
 
     return {"message": "Litige resolu"}
+
+@router.get("/audit-logs/{order_id}")
+def get_audit_logs(
+    order_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    from app.models.audit_log import AuditLog
+    logs = db.query(AuditLog).filter(
+        AuditLog.entity_type == "order",
+        AuditLog.entity_id == order_id
+    ).order_by(AuditLog.created_at.asc()).all()
+    result = []
+    for log in logs:
+        user = db.query(User).filter(User.id == log.user_id).first()
+        result.append({
+            "id": log.id,
+            "action": log.action,
+            "user_phone": user.phone if user else None,
+            "user_role": user.role if user else None,
+            "details": log.details,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+    return result
