@@ -394,9 +394,19 @@ def confirm_payment(
     if not order.commission:
         order.commission = calculate_commission(order.amount)
     order.payment_confirmed_at = now
+    client_id_for_notif = order.client_id
+    amount_for_notif = order.amount
 
     db.commit()
     db.refresh(order)
+    try:
+        from app.models.client_profile import ClientProfile
+        from app.services.notification_service import send_notification
+        cp = db.query(ClientProfile).filter(ClientProfile.user_id == client_id_for_notif).first()
+        if cp and cp.fcm_token:
+            send_notification(fcm_token=cp.fcm_token, title="💰 Paiement confirme", body=f"Le livreur a confirme la reception de {int(amount_for_notif):,} FCFA.", data={"order_id": str(order_id), "type": "payment_confirmed"})
+    except Exception as e:
+        print(f"[NOTIF] Erreur : {e}")
     return order_to_out(order, db)
 
 @router.post("/{order_id}/confirm-transport", response_model=OrderOut)
