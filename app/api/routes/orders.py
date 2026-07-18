@@ -249,6 +249,9 @@ def update_order_status(
                     )
             except Exception as e:
                 print(f"[NOTIF] Erreur notif client annulation : {e}")
+            db.commit()
+            db.refresh(order)
+            return order_to_out(order, db)
     if payload.status == "accepted":
         rider_profile_check = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
         if rider_profile_check and not rider_profile_check.is_available:
