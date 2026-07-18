@@ -10,6 +10,7 @@ from app.core.security import hash_code, verify_code, create_access_token
 from app.models.user import User
 from app.models.otp_code import OTPCode
 from app.schemas.auth import OTPStartRequest, OTPVerifyRequest, TokenResponse
+from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
@@ -82,3 +83,49 @@ def otp_verify(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(sub=phone)
     return TokenResponse(access_token=token)
+
+@router.post("/change-phone/start")
+def change_phone_start(
+    payload: OTPStartRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    phone = payload.phone.strip()
+    # Vérifier que le numéro n'est pas déjà utilisé
+    existing = db.query(User).filter(User.phone == phone).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ce numéro est déjà utilisé")
+    # Générer OTP
+    code = f"{secrets.randbelow(10**6):06d}"
+    code_h = hash_code(code)
+    expires_ts = int(time()) + settings.OTP_TTL_MINUTES * 60
+    db.add(OTPCode(phone=phone, code_hash=code_h, expires_at_ts=expires_ts))
+    db.commit()
+    resp = {"message": "Code envoyé au nouveau numéro"}
+    if settings.DEV:
+        resp["otp_for_test"] = code
+    return resp
+
+@router.post("/change-phone/verify")
+def change_phone_verify(
+    payload: OTPVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    phone = payload.phone.strip()
+    now_ts = int(time())
+    otp = (
+        db.query(OTPCode)
+        .filter(OTPCode.phone == phone)
+        .order_by(OTPCode.created_at.desc())
+        .first()
+    )
+    if not otp or otp.expires_at_ts < now_ts:
+        raise HTTPException(status_code=400, detail="Code expiré")
+    if not verify_code(payload.code, otp.code_hash):
+        raise HTTPException(status_code=400, detail="Code incorrect")
+    # Mettre à jour le numéro
+    current_user.phone = phone
+    db.delete(otp)
+    db.commit()
+    return {"message": "Numéro mis à jour avec succès"}
