@@ -48,6 +48,34 @@ def propose_price(
     if existing:
         existing.proposed_price = proposed_price
         db.commit()
+        # Envoyer message système dans le chat
+        try:
+            from app.models.message import Message
+            from datetime import timedelta
+            msg = Message(
+                order_id=order_id,
+                sender_id=current_user.id,
+                content=f"💰 Nouvelle offre : {int(proposed_price):,} FCFA",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+            )
+            db.add(msg)
+            db.commit()
+            # Notifier le client
+            from app.models.order import Order as OrderModel
+            from app.models.client_profile import ClientProfile
+            from app.services.notification_service import send_notification
+            order_obj = db.query(OrderModel).filter(OrderModel.id == order_id).first()
+            if order_obj:
+                client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order_obj.client_id).first()
+                if client_profile and client_profile.fcm_token:
+                    send_notification(
+                        fcm_token=client_profile.fcm_token,
+                        title="💰 Nouvelle offre du livreur",
+                        body=f"Le livreur propose maintenant {int(proposed_price):,} FCFA",
+                        data={"order_id": str(order_id), "type": "new_message"}
+                    )
+        except Exception as e:
+            print(f"[CHAT] Erreur message prix : {e}")
         return {"message": "Proposition mise a jour", "proposed_price": proposed_price}
 
     proposal = PriceProposal(
