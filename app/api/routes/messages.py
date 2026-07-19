@@ -13,6 +13,7 @@ router = APIRouter()
 @router.get("/orders/{order_id}/messages")
 def get_messages(
     order_id: int,
+    rider_id: int = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -31,9 +32,13 @@ def get_messages(
     now = datetime.now(timezone.utc)
     db.query(Message).filter(Message.expires_at < now).delete()
     db.commit()
-    messages = db.query(Message).filter(
-        Message.order_id == order_id
-    ).order_by(Message.created_at.asc()).all()
+    # Filtrer par rider_id si fourni
+    query = db.query(Message).filter(Message.order_id == order_id)
+    if rider_id:
+        query = query.filter(
+            (Message.rider_id == rider_id) | (Message.rider_id == None)
+        )
+    messages = query.order_by(Message.created_at.asc()).all()
     return [{
         "id": m.id,
         "sender_id": m.sender_id,
@@ -46,6 +51,7 @@ def get_messages(
 def send_message(
     order_id: int,
     content: str,
+    rider_id: int = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -61,11 +67,14 @@ def send_message(
     ).first()
     if current_user.id != order.client_id and current_user.id != order.rider_id and not has_proposal:
         raise HTTPException(status_code=403, detail="Accès refusé")
+    # Déterminer le rider_id de cette conversation
+    conversation_rider_id = rider_id or (order.rider_id if order.rider_id else (current_user.id if current_user.role == 'rider' else None))
     msg = Message(
         order_id=order_id,
         sender_id=current_user.id,
         content=content.strip(),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        rider_id=conversation_rider_id,
     )
     db.add(msg)
     db.commit()
