@@ -151,20 +151,20 @@ def accept_proposal(
     order.status = "accepted"
     order.accepted_at = now
     if order.order_type == "delivery":
-            import secrets
-            from time import time
-            code = f"{secrets.randbelow(10**6):06d}"
-            order.delivery_code = code
-            order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
-            try:
-                from app.services.sms_service import send_delivery_code_sms
-                send_delivery_code_sms(
-                    receiver_phone=order.receiver_phone,
-                    code=code,
-                    order_id=order.id,
-                )
-            except Exception as sms_err:
-                print(f"[SMS] Erreur envoi code : {sms_err}")
+        import secrets
+        from time import time
+        code = f"{secrets.randbelow(10**6):06d}"
+        order.delivery_code = code
+        order.delivery_code_expires_at = int(time()) + 60 * 60 * 24
+        try:
+            from app.services.sms_service import send_delivery_code_sms
+            send_delivery_code_sms(
+                receiver_phone=order.receiver_phone,
+                code=code,
+                order_id=order.id,
+            )
+        except Exception as sms_err:
+            print(f"[SMS] Erreur envoi code : {sms_err}")
 
     # Rejeter les autres propositions
     db.query(PriceProposal).filter(
