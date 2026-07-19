@@ -32,12 +32,10 @@ def get_messages(
     now = datetime.now(timezone.utc)
     db.query(Message).filter(Message.expires_at < now).delete()
     db.commit()
-    # Filtrer par rider_id si fourni
+    # Filtrer par rider_id strict
     query = db.query(Message).filter(Message.order_id == order_id)
     if rider_id:
-        query = query.filter(
-            (Message.rider_id == rider_id) | (Message.rider_id == None)
-        )
+        query = query.filter(Message.rider_id == rider_id)
     messages = query.order_by(Message.created_at.asc()).all()
     return [{
         "id": m.id,
