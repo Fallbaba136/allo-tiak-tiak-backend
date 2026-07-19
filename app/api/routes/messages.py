@@ -75,22 +75,26 @@ def send_message(
         from app.services.notification_service import send_notification
         from app.models.client_profile import ClientProfile
         from app.models.rider_profile import RiderProfile
-        if current_user.id == order.client_id and order.rider_id:
-            rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == order.rider_id).first()
-            if rider_profile and rider_profile.fcm_token:
-                send_notification(
-                    fcm_token=rider_profile.fcm_token,
-                    title="💬 Message du client",
-                    body=content.strip()[:80],
-                    data={"order_id": str(order_id), "type": "new_message"}
-                )
-        elif current_user.id == order.rider_id:
+        if current_user.id == order.client_id:
+            # Client envoie → notifier le livreur (assigné ou celui qui a proposé)
+            rider_id = order.rider_id or (has_proposal.rider_id if has_proposal else None)
+            if rider_id:
+                rider_profile = db.query(RiderProfile).filter(RiderProfile.user_id == rider_id).first()
+                if rider_profile and rider_profile.fcm_token:
+                    send_notification(
+                        fcm_token=rider_profile.fcm_token,
+                        title="💬 Message du client",
+                        body=msg.content[:80],
+                        data={"order_id": str(order_id), "type": "new_message"}
+                    )
+        else:
+            # Livreur envoie → notifier le client
             client_profile = db.query(ClientProfile).filter(ClientProfile.user_id == order.client_id).first()
             if client_profile and client_profile.fcm_token:
                 send_notification(
                     fcm_token=client_profile.fcm_token,
                     title="💬 Message du livreur",
-                    body=content.strip()[:80],
+                    body=msg.content[:80],
                     data={"order_id": str(order_id), "type": "new_message"}
                 )
     except Exception as e:
