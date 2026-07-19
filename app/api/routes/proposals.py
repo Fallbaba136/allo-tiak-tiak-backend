@@ -279,6 +279,8 @@ def counter_propose(
 ):
     if current_user.role != "client":
         raise HTTPException(status_code=403, detail="Reserve aux clients")
+    if counter_price < 500:
+        raise HTTPException(status_code=400, detail="Prix minimum : 500 FCFA")
 
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
