@@ -30,9 +30,9 @@ def propose_price(
         raise HTTPException(status_code=403, detail="Profil non autorise")
 
     if not profile.is_available:
+        raise HTTPException(status_code=403, detail="Vous devez etre disponible")
     if proposed_price < 500:
         raise HTTPException(status_code=400, detail="Prix minimum : 500 FCFA")
-        raise HTTPException(status_code=403, detail="Vous devez etre disponible")
 
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
