@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.models.message import Message
 from app.models.order import Order
 from app.models.user import User
+from app.models.price_proposal import PriceProposal
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -19,7 +20,12 @@ def get_messages(
     if not order:
         raise HTTPException(status_code=404, detail="Commande introuvable")
     # Vérifier que l'utilisateur est concerné par cette commande
-    if current_user.id != order.client_id and current_user.id != order.rider_id:
+    # Vérifier que l'utilisateur est le client, le livreur assigné, ou un livreur qui a proposé
+    has_proposal = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id,
+        PriceProposal.rider_id == current_user.id
+    ).first()
+    if current_user.id != order.client_id and current_user.id != order.rider_id and not has_proposal:
         raise HTTPException(status_code=403, detail="Accès refusé")
     # Supprimer les messages expirés
     now = datetime.now(timezone.utc)
@@ -48,7 +54,12 @@ def send_message(
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Commande introuvable")
-    if current_user.id != order.client_id and current_user.id != order.rider_id:
+    # Vérifier que l'utilisateur est le client, le livreur assigné, ou un livreur qui a proposé
+    has_proposal = db.query(PriceProposal).filter(
+        PriceProposal.order_id == order_id,
+        PriceProposal.rider_id == current_user.id
+    ).first()
+    if current_user.id != order.client_id and current_user.id != order.rider_id and not has_proposal:
         raise HTTPException(status_code=403, detail="Accès refusé")
     msg = Message(
         order_id=order_id,
