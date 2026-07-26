@@ -66,7 +66,14 @@ def send_message(
     if current_user.id != order.client_id and current_user.id != order.rider_id and not has_proposal:
         raise HTTPException(status_code=403, detail="Accès refusé")
     # Déterminer le rider_id de cette conversation
-    conversation_rider_id = rider_id or (order.rider_id if order.rider_id else (current_user.id if current_user.role == 'rider' else None))
+    if rider_id:
+        conversation_rider_id = rider_id
+    elif current_user.role == 'rider':
+        conversation_rider_id = current_user.id
+    elif order.rider_id:
+        conversation_rider_id = order.rider_id
+    else:
+        conversation_rider_id = None
     msg = Message(
         order_id=order_id,
         sender_id=current_user.id,
